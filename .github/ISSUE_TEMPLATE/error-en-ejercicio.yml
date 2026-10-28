@@ -1,0 +1,15 @@
+name: Error en una correlativa o dato
+description: Una materia, correlativa, electiva o fecha está mal
+labels: [bug]
+body:
+  - type: input
+    id: materia
+    attributes: {label: Materia o electiva, placeholder: "Ej: Sistemas Operativos"}
+    validations: {required: true}
+  - type: input
+    id: pagina
+    attributes: {label: Página, placeholder: "Malla, Planificador, Electivas..."}
+  - type: textarea
+    id: que
+    attributes: {label: Qué está mal y qué dice el plan oficial}
+    validations: {required: true}

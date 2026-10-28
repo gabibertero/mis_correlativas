@@ -1,0 +1,189 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { MATERIAS, EXAMENES } from '../data/plan.js';
+import { CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
+import { ETIQUETA, estadoDe, destraba, nombreCorto, porN } from '../lib/vista.js';
+
+const HS_LIMITE = 30; // shortcut: umbral de sobrecarga provisorio, lo define Gabi/`web`.
+const enCurso = MATERIAS.filter((m) => estadoDe(m.n) === 'cursando');
+const nombreCuatri = (id) => `${id.slice(5, 6)}º cuatrimestre ${id.slice(0, 4)}`;
+const cuatris = CUATRIS.map((id, i) => ({ id, nombre: nombreCuatri(id), actual: i === 0, extra: i >= CUATRIS_VISIBLES, mats: i === 0 ? enCurso : [] }));
+const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+const fmt = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric', month: 'long' });
+const dic = EXAMENES.map((e) => ({ ...e, d: new Date(`${e.fecha}T00:00:00`), impacto: destraba(e.materia).size })).sort((a, b) => a.d - b.d);
+const turnos = [
+  { id: 'dic-2026', nombre: 'Diciembre 2026', filas: dic },
+  { id: 'feb-mar-2027', nombre: 'Febrero / marzo 2027', filas: [] },
+  { id: 'jul-2027', nombre: 'Julio 2027', filas: [] },
+];
+---
+<Layout titulo="Planificador" descripcion="Armá cada cuatrimestre con validación de correlativas y horas, y ordená los finales por turno.">
+  <header class="cab">
+    <p class="eyebrow">Cursado y finales</p>
+    <h1>Planificador</h1>
+    <p class="lead">Armá cada cuatrimestre y fijate si cumplís las correlativas y si te pasás de horas. Abajo, los finales por turno, priorizados por lo que destraban.</p>
+  </header>
+
+  <section aria-labelledby="h-cuatris" data-vista="planificador">
+    <h2 id="h-cuatris" class="sr-only">Cuatrimestres</h2>
+    <div class="herramientas" hidden data-herramientas>
+      <button type="button" class="btn-primario" data-accion="proponer-plan">Proponer un plan</button>
+      <button type="button" data-accion="sumar-cuatri">Sumar un cuatrimestre</button>
+      <details class="ayuda"><summary>Cómo funciona</summary><p class="suave">Punto de partida, no definitivo: arma los cuatrimestres siguientes con las materias habilitadas que más destraban, respetando correlativas, modalidad y el límite de horas. Asume que aprobás lo que hoy cursás o tenés regular y lo de cada cuatrimestre anterior. No incluye la PPS. Las electivas las sumás vos a mano desde «Agregar»: validan correlativas y modalidad, y cuentan como horas semanales sus créditos. Arrastrá una materia a otro cuatrimestre para moverla.</p></details>
+      <p class="aviso" data-estado-plan role="status" aria-live="polite"></p>
+    </div>
+    <div class="cuatris">
+      {cuatris.map((c) => {
+        const hs = c.mats.reduce((a, m) => a + m.hs, 0);
+        return (
+          <article class="cuatri card" style={`--i:${cuatris.indexOf(c) + 1}`} data-cuatri={c.id} data-hs-limite={HS_LIMITE} hidden={c.extra} data-extra={c.extra ? 'si' : 'no'}>
+            <header>
+              <h3>{c.nombre}</h3>
+              {c.actual && <span class="en-curso">En curso</span>}
+            </header>
+            <p class="horas"><span class="num" data-hs-total>{hs}</span> <span class="suave">de {HS_LIMITE} hs semanales</span></p>
+            <progress max={HS_LIMITE} value={hs} aria-label={`Horas de ${c.nombre}`}></progress>
+            {c.mats.length ? (
+              <ul class="slots" data-slot-lista>
+                {c.mats.map((m) => (
+                  <li data-materia={m.n} data-hs={m.hs}><span class="n num">{m.n}</span><span class="s-nom">{m.nombre}<small>{m.hs} hs</small></span><span class="chip" data-estado={estadoDe(m.n)}>{ETIQUETA[estadoDe(m.n)]}</span></li>
+                ))}
+              </ul>
+            ) : <ul class="slots" data-slot-lista><li class="vacio">Sin materias. Agregá las que quieras cursar.</li></ul>}
+            <ul class="avisos" data-avisos aria-live="polite"></ul>
+            <div class="agregar" hidden data-agregar>
+              <select aria-label={`Materia a agregar en ${c.nombre}`} data-campo="materia"></select>
+              <button type="button" data-accion="agregar-materia">Agregar</button>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <section class="seccion" aria-labelledby="h-finales" data-vista="finales">
+    <header><h2 id="h-finales">Finales por turno</h2><p>Primero los que más destraban</p></header>
+    <div class="turnos">
+      {turnos.map((t) => (
+        <article class="turno card" data-turno={t.id}>
+          <h3>{t.nombre}</h3>
+          {t.filas.length ? (
+            <ul class="examenes">
+              {t.filas.map((e) => {
+                const dias = Math.round((e.d - hoy) / 86400000);
+                return (
+                  <li class="examen" data-examen data-fecha={e.fecha} data-materia={e.materia} data-tipo={e.tipo} data-opcional={e.opcional ? 'si' : 'no'} data-impacto={e.impacto}>
+                    <time class="fecha" datetime={e.fecha}><span class="num">{e.d.getDate()}</span>{fmt.format(e.d).split(' ').slice(-1)[0].slice(0, 3)}</time>
+                    <span class="ex-info"><strong>{nombreCorto(e.materia)}</strong><small>{e.etiqueta}</small></span>
+                    <span class="ex-meta">
+                      {e.impacto > 0 && <span class="impacto" title="Materias que destraba">Destraba {e.impacto}</span>}
+                      <span class="dias" data-dias>{dias >= 0 ? `en ${dias} d` : 'pasó'}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div class="pendiente">
+              <p class="vacio">Fechas sin cargar todavía.</p>
+              <label hidden data-fecha-editable>Agregar fecha de mesa
+                <input type="date" data-campo="fecha" />
+              </label>
+            </div>
+          )}
+        </article>
+      ))}
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import '../scripts/planificador.js';
+</script>
+
+<style is:global>
+  .cuatri[hidden] { display: none; }
+  /* Herramientas: barra de acciones + ayuda plegable + estado */
+  .herramientas { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); margin-bottom: var(--s-4); padding: var(--s-3) var(--s-4); align-items: center; border-radius: var(--r); background: linear-gradient(120deg, var(--acento2-suave), var(--sup) 75%); border: 1px solid color-mix(in srgb, var(--azul-solido) 30%, var(--borde)); }
+  .herramientas[hidden] { display: none; }
+  .herramientas > .aviso, .herramientas > .ayuda[open] { flex-basis: 100%; }
+  .ayuda summary { cursor: pointer; font-weight: 600; font-size: var(--t-s); color: var(--acento2); min-height: 44px; display: flex; align-items: center; }
+  .ayuda p { font-size: var(--t-s); padding-bottom: var(--s-2); max-width: 60rem; }
+  .aviso[data-estado-plan]:not(:empty) { padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); border-left: 4px solid var(--acento2); color: var(--texto); animation: subir .35s var(--suave-ease) both; }
+  .mover { grid-column: 3; grid-row: 1; justify-self: end; align-self: start; margin: calc(var(--s-2) * -1) calc(var(--s-2) * -1) 0 0; }
+  /* Arrastrar: la fila se levanta; los cuatris muestran dónde se puede soltar y el destino se ilumina */
+  .slots li[draggable='true'] { cursor: grab; touch-action: pan-y; }
+  .slots li[draggable='true']:hover { border-color: var(--acento2); box-shadow: var(--sombra-h); }
+  .slots li[data-arrastrando] { opacity: .45; transform: scale(.97) rotate(-1deg); border-style: dashed; cursor: grabbing; }
+  .cuatris:has([data-arrastrando]) .cuatri:not([hidden]) { border: 2px dashed color-mix(in srgb, var(--azul-solido) 55%, var(--borde)); }
+  .cuatri { position: relative; transition: background .2s, border-color .2s, box-shadow .2s, transform .2s var(--suave-ease); }
+  .cuatri[data-drop-activo] { border: 2px solid var(--acento2); background: var(--acento2-suave); box-shadow: 0 0 0 5px color-mix(in srgb, var(--azul-solido) 25%, transparent), var(--sombra-h); transform: scale(1.012); }
+  .cuatri[data-drop-activo]::after { content: 'Soltar acá'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: var(--s-2) var(--s-4); border-radius: 999px; background: var(--azul-solido); color: var(--sobre-azul); font-weight: 800; font-size: var(--t-s); box-shadow: 0 8px 22px rgb(0 0 0 / .25); pointer-events: none; animation: subir .2s var(--suave-ease) both; }
+  .cuatri[data-drop-activo] > * { opacity: .5; }
+  .slots li[data-continua], .slots li.continua { border-style: dashed; border-color: var(--acento2); background: transparent; }
+  .slots li[data-continua] .s-nom small { color: var(--acento2); font-weight: 600; }
+  /* Cuatrimestres sumados a mano: borde azul punteado + etiqueta, y entran con animación */
+  .cuatri[data-extra='si']:not([hidden]) { border-style: dashed; border-color: color-mix(in srgb, var(--azul-solido) 55%, var(--borde)); animation: subir .5s var(--suave-ease) both; }
+  .cuatri[data-extra='si'] header h3::after { content: 'Extra'; margin-left: var(--s-2); vertical-align: middle; font: 700 var(--t-xs)/1 var(--f-ui); padding: var(--s-1) var(--s-2); border-radius: 999px; background: var(--acento2-suave); color: var(--acento2); }
+  .cuatris { display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1100px) { .cuatris { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
+  .cuatri { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+  .cuatri header { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); }
+  .en-curso { font-size: var(--t-xs); font-weight: 700; color: var(--acento); background: var(--acento-suave); border-radius: 999px; padding: var(--s-1) var(--s-3); white-space: nowrap; }
+  .horas { font-size: var(--t-s); }
+  .horas .num { font-size: var(--t-2xl); font-weight: 800; line-height: 1; }
+  .slots, .examenes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+  /* En el ancho medio las materias van en 2 columnas dentro del cuatrimestre (no queda 70% vacío) */
+  @media (min-width: 600px) and (max-width: 1099px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } .slots .vacio { grid-column: 1 / -1; } }
+  .slots li:not(.vacio) { transition: transform .2s var(--suave-ease), border-color .15s, box-shadow .2s, opacity .2s; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-1) var(--s-3); padding: var(--s-2) var(--s-3); border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup2); }
+  .s-nom { flex: 1; min-width: 0; font-size: var(--t-s); font-weight: 600; line-height: 1.25; }
+  .s-nom { display: flex; flex-wrap: wrap; column-gap: var(--s-2); align-items: baseline; }
+  .s-nom small { font-weight: 400; color: var(--suave); font-size: var(--t-xs); }
+  .s-nom small.modalidad::before { content: '·'; margin-right: var(--s-2); }
+  /* Modalidad: metadato discreto en la misma línea que las horas (línea propia bajo las horas) */
+  .s-nom > small.modalidad[data-modalidad^='Solo'] { font-weight: 600; }
+  /* Contracuatrimestre: nota informativa azul tenue (no es error) con ícono "i" */
+  .s-nom > small.contra-cuatri { display: flex; flex: 1 0 100%; align-items: flex-start; gap: var(--s-1); margin-top: var(--s-1); padding: var(--s-1) var(--s-2); border-radius: var(--r-s); overflow-wrap: normal; hyphens: none; background: var(--acento2-suave); color: var(--acento2); font-weight: 600; line-height: 1.3; }
+  .contra-cuatri::before { content: ''; flex: none; width: 14px; height: 14px; margin-top: 1px; background: currentColor; mask: var(--i-info) center / contain no-repeat; -webkit-mask: var(--i-info) center / contain no-repeat; }
+  .avisos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
+  .avisos:empty { display: none; }
+  .avisos li { padding: var(--s-2) var(--s-3); border-radius: var(--r-s); border-left: 4px solid var(--error); background: var(--error-bg); color: var(--error); font-weight: 500; }
+  .cuatri[data-sobrecarga='si'] .horas .num { color: var(--error); }
+  .cuatri[data-sobrecarga='si'] progress::-webkit-progress-value { background: var(--error); }
+  .cuatri[data-sobrecarga='si'] progress::-moz-progress-bar { background: var(--error); }
+  .slots .n { grid-row: 1; align-self: start; }
+  .slots .s-nom { grid-column: 2; grid-row: 1; padding-top: var(--s-1); }
+  .slots .chip { grid-column: 2; grid-row: 2; justify-self: start; }
+  /* "Quitar" se dibuja como ✕ 44x44 (el texto queda en aria-label) */
+  /* Recursar: toggle en su propia fila + marca visible en el nombre (el disenador pinta los colores) */
+  .toggle-recursar { grid-column: 3; grid-row: 2; justify-self: end; width: 44px; padding: 0; font-size: 0; gap: 0; color: var(--suave); background: transparent; border-style: dashed; }
+  .toggle-recursar::before, .marca-recursar::before { content: ''; flex: none; width: 18px; height: 18px; background: currentColor; mask: var(--i-recursar) center / contain no-repeat; -webkit-mask: var(--i-recursar) center / contain no-repeat; }
+  .toggle-recursar[aria-pressed='true'] { border-style: solid; border-color: var(--acento2); background: var(--acento2-suave); color: var(--acento2); font-weight: 700; }
+  .marca-recursar { display: inline-flex !important; flex: 0 0 auto; align-items: center; gap: var(--s-1); margin-top: var(--s-1); padding: 0 var(--s-2); border-radius: 999px; background: var(--acento2-suave); color: var(--acento2) !important; font-weight: 700 !important; }
+  .marca-recursar::before { width: 12px; height: 12px; }
+  .chip-electiva { display: inline-block; margin-right: var(--s-1); padding: 0 var(--s-2); border-radius: 999px; border: 1px solid color-mix(in srgb, var(--acento2) 45%, transparent); background: var(--acento2-suave); color: var(--acento2); font-weight: 700; }
+  .slots li[data-electiva='si'] .n { background: var(--acento2-suave); color: var(--acento2); }
+  /* ✕ centrada: máscara SVG en vez de glifo (los glifos tienen sesgo vertical) */
+  .quitar { width: 44px; padding: 0; font-size: 0; border-color: transparent; background: transparent; color: var(--suave); }
+  .quitar::before { content: ''; width: 16px; height: 16px; background: currentColor; mask: var(--i-x) center / contain no-repeat; -webkit-mask: var(--i-x) center / contain no-repeat; }
+  .quitar:hover:not(:disabled) { background: var(--error-bg); border-color: transparent; color: var(--error); }
+  .ex-estado { color: var(--suave); }
+  .pendiente { display: grid; gap: var(--s-3); }
+  .agregar { display: flex; gap: var(--s-2); }
+  .agregar select { flex: 1; min-width: 0; font: inherit; min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-s); border: 1px solid var(--borde-fuerte); background: var(--sup2); color: var(--texto); }
+
+  .turnos { display: grid; gap: var(--s-4); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .turnos { grid-template-columns: 1.6fr 1fr 1fr; align-items: start; } }
+  .turno h3 { margin-bottom: var(--s-4); }
+  .examen { display: grid; grid-template-columns: auto 1fr; gap: var(--s-1) var(--s-3); align-items: center; padding: var(--s-3); border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup2); }
+  .examen[data-opcional='si'] { border-style: dashed; }
+  .fecha { grid-row: span 2; display: grid; place-items: center; width: 52px; padding: var(--s-1) 0; border-radius: var(--r-s); background: var(--acento2-suave); color: var(--acento2); font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; line-height: 1.1; }
+  .fecha .num { font-size: var(--t-xl); font-weight: 800; }
+  .ex-info { display: grid; line-height: 1.25; font-size: var(--t-s); }
+  .ex-info small { color: var(--suave); font-size: var(--t-xs); }
+  .ex-meta { display: flex; flex-wrap: wrap; gap: var(--s-2); font-size: var(--t-xs); font-weight: 700; }
+  .impacto { color: var(--acento2); background: var(--acento2-suave); border-radius: 999px; padding: var(--s-1) var(--s-3); }
+  .dias { color: var(--suave); padding: var(--s-1) 0; }
+  label { display: grid; gap: var(--s-1); font-size: var(--t-xs); font-weight: 700; color: var(--suave); margin-top: var(--s-3); }
+  input { font: inherit; min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-s); border: 1px solid var(--borde-fuerte); background: var(--sup2); color: var(--texto); }
+</style>

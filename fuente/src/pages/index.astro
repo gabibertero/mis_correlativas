@@ -1,0 +1,382 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { MATERIAS, MATERIAS_PLAN, NIVELES, ESTADO_INICIAL, EXAMENES, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { resumen, sinCursar, resumenPorNivel, proximosFinales, planProximoAnio, esElectiva } from '../lib/motor.js';
+import { NOMBRE_NIVEL, estadoDe, puedeCursar, puedeRendir, destraba, nombreCorto } from '../lib/vista.js';
+
+const base = import.meta.env.BASE_URL;
+const r = resumen(ESTADO_INICIAL);
+const total = r.total; // 36: el Seminario (opcional) no cuenta
+const aprobadas = MATERIAS_PLAN.filter((m) => estadoDe(m.n) === 'aprobada');
+const pct = r.pct;
+const notas = aprobadas.map((m) => ESTADO_INICIAL[m.n]?.nota).filter((x) => x != null);
+const promedio = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(2).replace('.', ',') : '—';
+const cursables = MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(m.n)) && puedeCursar(m));
+const rendibles = MATERIAS_PLAN.filter((m) => puedeRendir(m));
+const masDestraban = MATERIAS_PLAN.filter((m) => estadoDe(m.n) !== 'aprobada').map((m) => ({ m, d: destraba(m.n).size })).sort((a, b) => b.d - a.d).slice(0, 4);
+
+const niveles = resumenPorNivel(ESTADO_INICIAL);
+const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+const proximos = proximosFinales(EXAMENES, ESTADO_INICIAL);
+const plan2027 = planProximoAnio(ESTADO_INICIAL);
+const NOMBRE_CUATRI = { '2027-1C': '1º cuatrimestre 2027', '2027-2C': '2º cuatrimestre 2027' };
+const prox = EXAMENES.map((e) => ({ ...e, d: new Date(`${e.fecha}T00:00:00`) })).filter((e) => e.d >= hoy).sort((a, b) => a.d - b.d)[0];
+const dias = prox ? Math.round((prox.d - hoy) / 86400000) : null;
+const fmt = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+const R = 52, C = 2 * Math.PI * R;
+// Mini-malla del hero: un nodo por materia del plan (columna = nivel) y una arista por correlativa real.
+const GX = 40, GW = 96, GY = 22, GH = 276;
+const pos = {};
+for (const nv of NIVELES) {
+  const ms = MATERIAS_PLAN.filter((m) => m.nivel === nv).sort((a, b) => a.n - b.n);
+  ms.forEach((m, i) => { pos[m.n] = { x: GX + (nv - 1) * GW, y: ms.length === 1 ? GY + GH / 2 : GY + (GH / (ms.length - 1)) * i }; });
+}
+const aristas = MATERIAS_PLAN.flatMap((m) => [...m.reg, ...m.aprob].filter((p) => pos[p] && pos[m.n]).map((p) => ({ a: pos[p], b: pos[m.n] })));
+const kpis = [
+  { id: 'aprobadas', valor: `${aprobadas.length}`, obj: aprobadas.length, de: `/${total}`, label: 'Materias aprobadas' },
+  { id: 'promedio', valor: promedio, de: '', label: `Promedio · ${notas.length} notas` },
+  { id: 'finales', valor: `${rendibles.length}`, obj: rendibles.length, de: '', label: 'Finales por rendir', urgencia: r.urgencia },
+];
+const pasos = [
+  { id: 'avance', valor: pct, etiqueta: 'Hoy', sub: 'Lo que ya aprobaste', n: aprobadas.length },
+  { id: 'proy-cursando', valor: r.proyCursando.pct, etiqueta: 'Si apruebo lo que curso', sub: 'Aprobadas más las que cursás', n: r.proyCursando.n },
+  { id: 'proy-finales', valor: r.proyFinales.pct, etiqueta: 'Si apruebo lo que curso y los finales', sub: 'Más los finales que podés rendir', n: r.proyFinales.n },
+];
+---
+<Layout titulo="Inicio">
+  <section class="hero" aria-labelledby="titulo-hero">
+    <svg class="hero-red" viewBox="0 0 440 320" aria-hidden="true" fill="none" preserveAspectRatio="xMaxYMid meet">
+      <g class="enlaces" stroke="currentColor" stroke-width="1.2">
+        {aristas.map((e) => <line x1={e.a.x} y1={e.a.y} x2={e.b.x} y2={e.b.y} />)}
+      </g>
+      <g class="nodos">
+        {MATERIAS_PLAN.map((m) => <circle data-nodo={m.n} data-estado={estadoDe(m.n)} cx={pos[m.n].x} cy={pos[m.n].y} r="6" />)}
+      </g>
+    </svg>
+    <div class="hero-texto">
+      <p class="eyebrow">Ingeniería en Sistemas<span class="sep" aria-hidden="true">·</span>Plan 2023<span class="sep" aria-hidden="true">·</span>UTN FRC</p>
+      <h1 id="titulo-hero">Tu carrera, <span class="resalte">materia por materia</span>.</h1>
+      <p class="lead">Llevás <strong class="num" data-kpi-texto="aprobadas">{aprobadas.length}</strong> de {total} aprobadas. Mirá qué podés cursar y rendir ahora, y qué te destraba cada final.</p>
+      <div class="acciones">
+        <a class="btn btn-primario" href={`${base}malla/`}>Ver la malla</a>
+        <a class="btn" href="#ahora">Qué puedo hacer ahora</a>
+      </div>
+    </div>
+    <div class="anillo-card">
+      <div class="anillo" role="img" aria-label={`Avance de la carrera: ${pct} por ciento`} data-anillo>
+        <svg viewBox="0 0 120 120">
+          <defs><linearGradient id="grad-anillo" x1="0.5" y1="0" x2="0.5" y2="1"><stop offset="0.1" class="g1" /><stop offset="0.9" class="g2" /></linearGradient></defs>
+          <circle cx="60" cy="60" r={R} class="pista"/>
+          <circle cx="60" cy="60" r={R} class="valor" stroke-dasharray={C.toFixed(1)} stroke-dashoffset={(C * (1 - pct / 100)).toFixed(1)} style={`--c:${C.toFixed(1)}`} transform="rotate(-90 60 60)"/>
+        </svg>
+        <p class="anillo-n"><span class="num" data-anillo-valor>{pct}</span><small>%</small></p>
+      </div>
+      <p class="anillo-t"><strong>Avance de la carrera</strong><span>{aprobadas.length} de {total} materias</span></p>
+    </div>
+  </section>
+
+  <section class="proy card" aria-labelledby="h-proy" data-vista="kpis" data-proyeccion style={`--hoy:${pct}%;--cur:${r.proyCursando.pct}%;--fin:${r.proyFinales.pct}%`}>
+    <header><h2 id="h-proy">Hacia dónde vas</h2><p>Tu avance de hoy y dónde llegarías</p></header>
+    <ol class="pasos">
+      {pasos.map((k, i) => (
+        <li class="kpi paso" data-kpi={k.id} data-n={k.n} data-total={total} data-paso={i} style={`--i:${i + 1}`}>
+          <p class="paso-e">{k.etiqueta}</p>
+          <p class="paso-v"><span class="num" data-valor data-objetivo={k.valor}>{k.valor}</span><span class="de">%</span></p>
+        </li>
+      ))}
+    </ol>
+    <div class="apilada" aria-hidden="true"><i class="a-fin"></i><i class="a-cur"></i><i class="a-hoy"></i></div>
+    <p class="leyenda-barra"><span><i class="l-hoy"></i>Aprobadas hoy</span><span><i class="l-cur"></i>Si apruebo lo que curso</span><span><i class="l-fin"></i>Más los finales</span></p>
+  </section>
+
+  <section class="kpis" aria-label="Resumen">
+    {kpis.map((k, i) => (
+      <div class="kpi card" data-kpi={k.id} data-nivel-urgencia={k.urgencia} style={`--i:${i + 2}`}>
+        {k.id === 'finales' && <p class="sem-etq" aria-hidden="true"><span data-sem="ok">Al día</span><span data-sem="medio">A rendir</span><span data-sem="alto">Muchos pendientes</span></p>}
+        <p class="kpi-v"><span class="num" data-valor data-objetivo={k.obj}>{k.valor}</span><span class="de">{k.de}</span></p>
+        <p class="kpi-l">{k.label}</p>
+      </div>
+    ))}
+  </section>
+
+  <div class="dos">
+    <section class="seccion card" aria-labelledby="h-niveles" data-vista="niveles">
+      <header><h2 id="h-niveles">Avance por nivel</h2></header>
+      <ul class="niveles">
+        {niveles.map((n) => (
+          <li data-nivel-bar={n.nv} data-total={n.total} data-aprobadas={n.aprobadas} data-mas-cursando={n.masCursando} data-mas-finales={n.masFinales}>
+            <a href={`${base}malla/#nivel-${n.nv}`}>
+              <span class="nv-n"><span class="num" data-ok>{n.aprobadas}</span>/{n.total}</span>
+              <span class="nv-t">{NOMBRE_NIVEL[n.nv]}</span>
+              <span class="nv-p num" data-pct>{Math.round((n.aprobadas / n.total) * 100)}%</span>
+              <span class="barra" aria-hidden="true"><i class="b-ok" style={`width:${(n.aprobadas / n.total) * 100}%`}></i><i class="b-cursando" style={`width:${(n.masCursando / n.total) * 100}%`}></i><i class="b-finales" style={`width:${(n.masFinales / n.total) * 100}%`}></i></span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p class="leyenda-barra"><span><i class="b-ok"></i>Aprobadas</span><span><i class="b-cursando"></i>Si apruebo lo que curso</span><span><i class="b-finales"></i>Si apruebo los finales</span></p>
+    </section>
+
+    <div class="col">
+      <section class="seccion card cuenta" aria-labelledby="h-mesa" data-vista="cuenta-regresiva" id="cuenta-regresiva">
+        <header><h2 id="h-mesa">Próximos finales</h2></header>
+        {prox ? (
+          <div data-countdown data-fecha={prox.fecha} data-materia={prox.materia}>
+            <p class="cuenta-n"><span class="num" data-dias>{dias}</span><span>{dias === 1 ? 'día' : 'días'}</span></p>
+            <p class="cuenta-m"><strong>{nombreCorto(prox.materia)}</strong></p>
+            <p class="suave"><time datetime={prox.fecha}>{fmt.format(prox.d).replace(/^./, (c) => c.toUpperCase())}</time><span class="sep" aria-hidden="true">·</span>{prox.etiqueta}</p>
+          </div>
+        ) : <p class="vacio">No hay mesas cargadas. Sumalas desde el Planificador.</p>}
+        <ol class="proximos" data-proximos-finales>
+          {proximos.map((e) => <li data-materia={e.materia} data-fecha={e.fecha} data-tipo={e.tipo} data-opcional={e.opcional ? 'si' : null}><time datetime={e.fecha}>{fmt.format(new Date(`${e.fecha}T00:00:00`)).replace(/^./, (c) => c.toUpperCase())}</time><strong>{nombreCorto(e.materia)}</strong><small>{e.etiqueta}</small></li>)}
+        </ol>
+      </section>
+      <section class="seccion card" aria-labelledby="h-cred" data-vista="creditos">
+        <header><h2 id="h-cred">Créditos electivos</h2><a href={`${base}electivas/`}>Ver electivas</a></header>
+        <div class="cred" data-creditos="ing"><p><span>Ingeniería</span><span><b class="num" data-valor>0</b>/{CREDITOS_INGENIERIA}</span></p><progress max={CREDITOS_INGENIERIA} value="0" aria-label="Créditos para Ingeniería"></progress></div>
+        <div class="cred" data-creditos="analista"><p><span>Analista · 3er nivel</span><span><b class="num" data-valor>0</b>/{CREDITOS_ANALISTA}</span></p><progress max={CREDITOS_ANALISTA} value="0" aria-label="Créditos de tercer nivel para Analista"></progress></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="seccion" id="ahora" aria-labelledby="h-ahora" data-vista="ahora">
+    <header><h2 id="h-ahora">Qué puedo hacer ahora</h2><p>Según tu estado actual</p></header>
+    <div class="card plan-anio" data-plan-anio>
+      <h3>Tu plan para 2027</h3>
+      <div class="plan-cuatris">
+        {plan2027.map((c) => (
+          <section data-cuatri-plan={c.id} aria-label={NOMBRE_CUATRI[c.id]}>
+            <h4>{NOMBRE_CUATRI[c.id]}<small data-hs>{c.hs} hs</small></h4>
+            {c.items.length ? <ul>{c.items.map((it) => <li data-materia={it.n} data-electiva={it.electiva ? 'si' : 'no'}><span class="n num">{it.electiva ? 'E' : it.n}</span><span>{it.electiva ? 'Electiva' : nombreCorto(it.n)}<small data-razon>{it.razon}</small></span></li>)}</ul> : <p class="vacio">Sin materias propuestas.</p>}
+          </section>
+        ))}
+      </div>
+      <p class="suave">Propuesta automática: da por rendido lo que cursás hoy. Ajustala en el <a href={`${base}planificador/`}>Planificador</a>.</p>
+    </div>
+    <div class="tres">
+      <div class="card lista-c lc-cursar" data-lista="cursar">
+        <h3><span class="insignia-hab">Habilitadas</span>Podés cursar</h3>
+        {cursables.length ? <ul>{cursables.map((m) => <li data-materia={m.n}><span class="n num">{m.n === 99 ? 'S' : m.n}</span>{m.nombre}</li>)}</ul> : <p class="vacio">Nada habilitado por ahora.</p>}
+      </div>
+      <div class="card lista-c lc-finales" data-lista="finales">
+        <h3>Podés rendir el final</h3>
+        {rendibles.length ? <ul>{rendibles.map((m) => <li data-materia={m.n}><span class="n num">{m.n}</span>{m.nombre}</li>)}</ul> : <p class="vacio">Ningún final habilitado por ahora.</p>}
+      </div>
+      <div class="card lista-c lc-destraba" data-lista="destraba">
+        <h3>Las que más destraban</h3>
+        <ul>{masDestraban.map(({ m, d }) => <li data-materia={m.n}><span class="n num">{m.n === 99 ? 'S' : m.n}</span><span>{m.nombre}<small>destraba {d}</small></span></li>)}</ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion card respaldo" aria-labelledby="h-resp" data-vista="respaldo">
+    <div>
+      <h2 id="h-resp">Tus datos, tuyos</h2>
+      <p class="suave">Todo se guarda solo en este navegador. Exportá un archivo para respaldarlo o seguir en otro dispositivo.</p>
+    </div>
+    <div class="acciones">
+      <button type="button" class="btn-primario" data-accion="exportar" hidden>Exportar estado</button>
+      <button type="button" data-accion="importar" hidden>Importar estado</button>
+      <input type="file" accept="application/json,.json" data-importar-archivo hidden aria-label="Archivo de estado a importar" />
+    </div>
+    <p class="aviso" data-estado-import role="status" aria-live="polite"></p>
+  </section>
+</Layout>
+
+<script>
+  import '../scripts/inicio.js';
+</script>
+
+
+<style is:global>
+  /* ---------- Hero ---------- */
+  .hero { position: relative; display: grid; gap: var(--s-6); grid-template-columns: minmax(0, 1fr); align-items: center; padding: var(--s-8) var(--s-4); border-radius: calc(var(--r) + 8px); border: 1px solid var(--borde); overflow: hidden; isolation: isolate;
+    background:
+      radial-gradient(60% 90% at 0% 0%, color-mix(in srgb, var(--marca) 26%, transparent), transparent 70%),
+      radial-gradient(55% 80% at 100% 100%, color-mix(in srgb, var(--azul-solido) 22%, transparent), transparent 70%),
+      var(--sup); }
+  .hero-texto { position: relative; display: grid; gap: var(--s-4); z-index: 1; }
+  .hero-texto .eyebrow { text-wrap: balance; }
+  .hero-texto h1 { max-width: 13ch; }
+  .resalte { background: linear-gradient(100deg, var(--acento) 10%, var(--acento2) 90%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .acciones { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+  .hero-red { position: absolute; top: 0; right: 0; bottom: 0; width: 100%; height: 100%; z-index: -1; color: var(--acento); opacity: .22; pointer-events: none; }
+  @media (min-width: 761px) { .hero-red { width: 44%; opacity: .55; mask-image: linear-gradient(90deg, transparent 10%, #000 60%); -webkit-mask-image: linear-gradient(90deg, transparent 10%, #000 60%); } }
+  .enlaces line { stroke-opacity: .18; stroke-dasharray: 3 7; animation: flujo 2.4s var(--suave-ease) 1 both; }
+  .nodos circle { fill: var(--sup); stroke: var(--borde-fuerte); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; }
+  .nodos circle[data-estado='aprobada'] { fill: var(--marca); stroke: var(--marca-3); }
+  .nodos circle[data-estado='promocion'] { fill: var(--e-promocion); stroke: var(--e-promocion); }
+  .nodos circle[data-estado='libre'] { fill: var(--e-libre); stroke: var(--e-libre); }
+  .nodos circle[data-estado='abandono'] { fill: var(--e-abandono-bg); stroke: var(--e-abandono); stroke-dasharray: 2 2; }
+  .nodos circle[data-estado='recursando'] { fill: var(--e-recursando); stroke: var(--azul-fuerte); stroke-dasharray: 3 1.5; }
+  .nodos circle[data-estado='regular'], .nodos circle[data-estado='cursando'] { fill: var(--azul-solido); stroke: var(--azul-fuerte); }
+  .nodos circle[data-habilitada='si'][data-estado='pendiente'] { stroke: var(--acento); stroke-width: 3; animation: pulso 2.6s ease-in-out 2; }
+  @keyframes flujo { to { stroke-dashoffset: -40; } }
+  @keyframes pulso { 50% { transform: scale(1.5); } }
+
+  .anillo-card { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4); border-radius: var(--r); background: color-mix(in srgb, var(--sup) 82%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--borde); box-shadow: var(--sombra-h); justify-self: start; animation: subir .7s var(--suave-ease) .15s both; }
+  .anillo { position: relative; width: 112px; height: 112px; flex: none; }
+  .anillo svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--marca) 40%, transparent)); }
+  .anillo circle { fill: none; stroke-width: 10; stroke-linecap: round; }
+  .g1 { stop-color: var(--marca); } .g2 { stop-color: var(--acento2); }
+  .pista { stroke: var(--e-pendiente-bg); }
+  .valor { stroke: url(#grad-anillo); animation: llenar 1.6s var(--suave-ease) .2s both; }
+  @keyframes llenar { from { stroke-dashoffset: var(--c); } }
+  .valor { transition: stroke-dashoffset 1s var(--suave-ease); }
+  .anillo-n { position: absolute; inset: 0; display: flex; align-items: baseline; justify-content: center; gap: var(--s-1); padding-top: 32px; font-family: var(--f-disp); }
+  .anillo-n .num { font-size: 2.25rem; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+  .anillo-n small { font-size: var(--t-m); font-weight: 700; color: var(--suave); }
+  .anillo-t { display: grid; gap: 2px; font-size: var(--t-s); color: var(--suave); }
+  .anillo-t strong { color: var(--texto); font-family: var(--f-disp); font-size: var(--t-l); line-height: 1.15; }
+  @media (min-width: 761px) {
+    .hero { grid-template-columns: minmax(0, 1fr) auto; padding: var(--s-12) var(--s-12); gap: var(--s-12); }
+    .anillo-card { flex-direction: column; text-align: center; padding: var(--s-6); justify-self: end; gap: var(--s-3); }
+    .anillo { width: 200px; height: 200px; }
+    .anillo-n { padding-top: 62px; }
+    .anillo-n .num { font-size: 3.75rem; } .anillo-n small { font-size: var(--t-xl); }
+  }
+
+  /* ---------- Hacia dónde vas (hoy -> proyectado) ---------- */
+  .proy { margin-top: var(--s-6); display: grid; gap: var(--s-4); }
+  .proy > header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-1) var(--s-4); }
+  .proy > header p { color: var(--suave); font-size: var(--t-s); }
+  .pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr); }
+  .paso { position: relative; display: grid; gap: var(--s-1); padding: var(--s-3) var(--s-4); border-radius: var(--r-s); background: var(--sup2); border: 1px solid var(--borde); border-left: 6px solid var(--c, var(--relleno)); }
+  .paso[data-paso='0'] { --c: var(--relleno); }
+  .paso[data-paso='1'] { --c: var(--azul-solido); }
+  .paso[data-paso='2'] { --c: color-mix(in srgb, var(--azul-solido) 45%, var(--sup)); }
+  .paso { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'e v' 'n v'; align-items: center; }
+  .paso-e { grid-area: e; }
+  .paso-v { grid-area: v; }
+  .paso::after { grid-area: n; }
+  .paso-e { font-size: var(--t-s); font-weight: 600; color: var(--suave); line-height: 1.3; }
+  .paso-v { font-family: var(--f-disp); font-weight: 800; font-size: 2.5rem; line-height: 1; letter-spacing: -.03em; display: flex; align-items: baseline; }
+  .paso-v .de { font-size: var(--t-xl); color: var(--suave); margin-left: var(--s-1); }
+  .paso[data-paso='0'] .paso-v .num { color: var(--acento); }
+  .paso[data-paso='1'] .paso-v .num, .paso[data-paso='2'] .paso-v .num { color: var(--acento2); }
+  .paso::after { content: attr(data-n) ' de ' attr(data-total) ' materias'; font-size: var(--t-xs); color: var(--suave); font-variant-numeric: tabular-nums; }
+  @media (min-width: 761px) {
+    .pasos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-6); }
+    .paso { padding: var(--s-4) var(--s-4) var(--s-4) var(--s-6); border-left-width: 1px; border-top: 6px solid var(--c); }
+    .paso:not(:last-child)::before { content: ''; position: absolute; right: calc(var(--s-6) / -1 - 1px); top: 50%; width: 24px; height: 24px; margin-top: -12px; z-index: 1; background: var(--azul-solido); mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14m-5-6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14m-5-6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat; }
+    .paso-v { font-size: 4rem; }
+    .paso { grid-template-columns: 1fr; grid-template-areas: 'e' 'v' 'n'; align-items: start; }
+  }
+  .apilada { position: relative; height: 20px; border-radius: 999px; background: var(--e-pendiente-bg); overflow: hidden; box-shadow: inset 0 1px 2px rgb(0 0 0 / .12); }
+  .apilada i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 999px; transition: width 1s var(--suave-ease); animation: crecer-w 1.4s var(--suave-ease) both; }
+  .a-fin { width: var(--fin); background: color-mix(in srgb, var(--azul-solido) 40%, var(--sup)); animation-delay: .1s !important; }
+  .a-cur { width: var(--cur); background: var(--azul-solido); animation-delay: .25s !important; }
+  .a-hoy { width: var(--hoy); background: linear-gradient(90deg, var(--relleno), var(--marca)); box-shadow: 2px 0 0 var(--sup); animation-delay: .4s !important; }
+  @keyframes crecer-w { from { width: 0; } }
+  .l-hoy, .l-cur, .l-fin { background: var(--relleno); }
+  .l-cur { background: var(--azul-solido); } .l-fin { background: color-mix(in srgb, var(--azul-solido) 40%, var(--sup)); }
+
+  /* ---------- KPIs ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); margin-top: var(--s-4); }
+  .kpis .kpi:nth-child(3) { grid-column: 1 / -1; }
+  @media (min-width: 761px) { .kpi { padding: var(--s-6); align-content: center; } .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); } .kpis .kpi:nth-child(3) { grid-column: auto; } }
+  .kpi { padding: var(--s-4); display: grid; gap: var(--s-1); align-content: start; }
+  .kpi-v { font-family: var(--f-disp); font-weight: 800; font-size: var(--t-2xl); line-height: 1.1; letter-spacing: -.02em; }
+  .kpi-v .de { font-size: var(--t-l); color: var(--suave); font-weight: 700; margin-left: var(--s-1); }
+  .kpi-l { font-size: var(--t-s); color: var(--suave); }
+  .kpi[data-kpi='aprobadas'] .kpi-v .num { color: var(--e-aprobada); }
+  .kpi[data-kpi='promedio'] .kpi-v .num { color: var(--acento2); }
+  /* Semáforo de finales por rendir: ok = verde fuerte, medio = amarillo, alto = naranja */
+  .sem-etq { font-size: var(--t-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+  .sem-etq span { display: none; align-items: center; gap: 6px; }
+  .sem-etq span::before { content: ''; width: 14px; height: 14px; background: currentColor; mask: var(--i-tilde) center / contain no-repeat; -webkit-mask: var(--i-tilde) center / contain no-repeat; }
+  .kpi[data-nivel-urgencia='ok'] [data-sem='ok'], .kpi[data-nivel-urgencia='medio'] [data-sem='medio'], .kpi[data-nivel-urgencia='alto'] [data-sem='alto'] { display: inline-flex; }
+  .kpi[data-nivel-urgencia='medio'] [data-sem='medio']::before, .kpi[data-nivel-urgencia='alto'] [data-sem='alto']::before { mask: none; -webkit-mask: none; background: none; content: '!'; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; border: 2px solid currentColor; font-size: 11px; line-height: 1; }
+  .kpi[data-nivel-urgencia] { color: var(--sem-t); background: var(--sem); border-color: var(--sem); box-shadow: 0 8px 22px color-mix(in srgb, var(--sem) 32%, transparent); }
+  .kpi[data-nivel-urgencia] .kpi-l, .kpi[data-nivel-urgencia] .kpi-v .de { color: inherit; }
+  .kpi[data-nivel-urgencia='ok'] { --sem: var(--sem-ok); --sem-t: var(--sem-ok-t); }
+  .kpi[data-nivel-urgencia='medio'] { --sem: var(--sem-medio); --sem-t: var(--sem-medio-t); }
+  .kpi[data-nivel-urgencia='alto'] { --sem: var(--sem-alto); --sem-t: var(--sem-alto-t); }
+  .kpi[data-nivel-urgencia='alto'] .kpi-v .num { animation: aviso 1.6s ease-in-out infinite; }
+  @keyframes aviso { 50% { opacity: .65; } }
+
+  /* ---------- Avance por nivel ---------- */
+  .dos { display: grid; gap: var(--s-4); margin-top: var(--s-12); }
+  @media (min-width: 900px) { .dos { grid-template-columns: 1.3fr 1fr; align-items: start; } }
+  .dos .seccion { margin-top: 0; }
+  .col { display: grid; gap: var(--s-4); }
+  .niveles { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+  .niveles a { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: var(--s-1) var(--s-3); padding: var(--s-2) var(--s-3); margin: 0 calc(var(--s-3) * -1); border-radius: var(--r-s); text-decoration: none; color: var(--texto); min-height: 44px; transition: background .15s, transform .15s; }
+  .niveles a:hover { background: var(--sup2); transform: translateX(3px); }
+  .nv-n { font-family: var(--f-disp); font-weight: 800; font-size: var(--t-l); color: var(--texto); font-variant-numeric: tabular-nums; min-width: 3.2ch; }
+  .nv-n .num { color: var(--acento); }
+  .nv-t { font-weight: 600; font-size: var(--t-s); }
+  .nv-p { font-weight: 800; font-size: var(--t-l); color: var(--acento); }
+  .barra { grid-column: 1 / -1; display: flex; height: 14px; border-radius: 999px; background: var(--e-pendiente-bg); overflow: hidden; box-shadow: inset 0 1px 2px rgb(0 0 0 / .12); }
+  .barra i { display: block; height: 100%; transition: width .9s var(--suave-ease); animation: crecer-w 1.2s var(--suave-ease) both; }
+  /* Tres capas de verde, de firme a tenue: lo que tengo / + lo que cursás / + los finales (las rayas suman una pista que no depende del color) */
+  .b-ok { background: linear-gradient(90deg, var(--relleno), var(--marca)); background-size: 200% 100%; }
+  .b-cursando { background: light-dark(#4fae7a, #1fa05a); }
+  .b-finales { background: repeating-linear-gradient(135deg, light-dark(#a9dcc0, #1b6b43) 0 4px, light-dark(#c9ead8, #14472c) 4px 8px); }
+  .barra .b-ok { animation: crecer-w 1.2s var(--suave-ease) both, brillo 4s linear 1.4s 1; }
+  @keyframes brillo { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+  .leyenda-barra { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); margin-top: var(--s-4); font-size: var(--t-xs); color: var(--suave); }
+  .leyenda-barra span { display: inline-flex; align-items: center; gap: 6px; }
+  .leyenda-barra i { width: 12px; height: 12px; border-radius: 4px; display: block; }
+
+  .cuenta { background: linear-gradient(160deg, var(--acento2-suave), var(--sup) 85%); border-color: color-mix(in srgb, var(--azul-solido) 35%, var(--borde)); }
+  .cuenta-n { display: flex; align-items: baseline; gap: var(--s-2); font-family: var(--f-disp); font-weight: 800; color: var(--acento2); font-size: var(--t-l); }
+  .cuenta-n .num { font-size: 4rem; line-height: 1; letter-spacing: -.03em; }
+  .cuenta-m { font-size: var(--t-l); margin-top: var(--s-1); }
+  /* Próximos finales: fecha en cajita + materia; los opcionales van punteados */
+  .proximos { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-2); }
+  .proximos li { display: grid; grid-template-areas: 'f' 'm' 'e'; gap: 2px; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: color-mix(in srgb, var(--sup) 72%, transparent); border: 1px solid var(--borde); font-size: var(--t-s); }
+  .proximos time { grid-area: f; font-weight: 700; color: var(--acento2); font-variant-numeric: tabular-nums; }
+  .proximos strong { grid-area: m; font-weight: 700; }
+  .proximos small { grid-area: e; color: var(--suave); font-size: var(--t-xs); }
+  .proximos li[data-opcional='si'] { border-style: dashed; border-color: var(--borde-fuerte); background: transparent; }
+  .proximos li[data-opcional='si'] strong::after { content: 'Opcional'; margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: 999px; font-size: var(--t-xs); font-weight: 600; color: var(--suave); border: 1px solid var(--borde-fuerte); }
+  .cred { margin-top: var(--s-4); }
+  .cred p { display: flex; justify-content: space-between; align-items: baseline; font-size: var(--t-s); margin-bottom: var(--s-2); }
+  .cred p b { font-family: var(--f-disp); font-size: var(--t-l); }
+
+  /* ---------- Qué puedo hacer ahora (listas) ---------- */
+  .tres { display: grid; gap: var(--s-4); align-items: start; }
+  @media (min-width: 900px) { .tres { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .lista-c { border-top: 4px solid var(--c-lista, var(--borde)); border-top-left-radius: var(--r); border-top-right-radius: var(--r); }
+  .lc-cursar { --c-lista: var(--acento); }
+  .lc-finales { --c-lista: var(--acento2); }
+  .lc-destraba { --c-lista: var(--borde-fuerte); }
+  .tres h3 { margin-bottom: var(--s-4); font-size: var(--t-l); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+  .tres h3 .insignia-hab { order: 2; font-family: var(--f-ui); letter-spacing: 0; }
+  .tres ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); counter-reset: fila; }
+  .tres li:not(.vacio) { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-s); font-weight: 600; line-height: 1.3; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup2); border: 1px solid var(--borde); transition: transform .15s, border-color .15s, background .15s; }
+  .tres li:not(.vacio):hover { transform: translateX(3px); border-color: var(--c-lista, var(--borde-fuerte)); }
+  .tres .n { width: 36px; height: 36px; border-radius: 10px; font-family: var(--f-disp); font-size: var(--t-m); }
+  .lc-cursar .n { background: var(--acento); color: var(--sobre-acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--marca) 28%, transparent); }
+  .lc-finales .n { background: var(--acento2-suave); color: var(--acento2); }
+  .lc-destraba .n { background: var(--e-pendiente-bg); color: var(--texto); }
+  .tres li > span:not(.n) { display: grid; gap: 2px; min-width: 0; }
+  .tres small { display: inline-flex; align-items: center; justify-self: start; gap: 4px; color: var(--acento2); background: var(--acento2-suave); font-weight: 700; font-size: var(--t-xs); padding: 0 var(--s-2); border-radius: 999px; }
+  .tres small::before { content: '↳'; }
+  .tres .vacio { margin: 0; }
+
+  /* Plan 2027: dos cuatrimestres, cada materia con su razón corta */
+  .plan-anio { margin-bottom: var(--s-4); display: grid; gap: var(--s-4); }
+  .plan-cuatris { display: grid; gap: var(--s-6); }
+  @media (min-width: 761px) { .plan-cuatris { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .plan-cuatris h4 { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 2px solid var(--borde); font-family: var(--f-disp); font-size: var(--t-m); }
+  .plan-cuatris h4 small { font-family: var(--f-ui); font-size: var(--t-xs); font-weight: 700; padding: 0 var(--s-2); border-radius: 999px; background: var(--acento-suave); color: var(--acento); }
+  .plan-cuatris ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+  .plan-cuatris li { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-s); font-weight: 600; line-height: 1.3; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup2); border: 1px solid var(--borde); }
+  .plan-cuatris .n { width: 36px; height: 36px; border-radius: 10px; font-family: var(--f-disp); background: var(--acento); color: var(--sobre-acento); }
+  .plan-cuatris li > span:not(.n) { display: grid; gap: 2px; min-width: 0; }
+  .plan-cuatris li small { font-weight: 500; font-size: var(--t-xs); color: var(--suave); }
+  .plan-cuatris li[data-electiva='si'] { border-style: dashed; border-color: var(--borde-fuerte); }
+  .plan-cuatris li[data-electiva='si'] .n { background: var(--acento2-suave); color: var(--acento2); }
+  .plan-cuatris .vacio { margin: 0; }
+  .plan-anio > p { font-size: var(--t-s); }
+
+  .respaldo { display: grid; gap: var(--s-4); align-items: center; }
+  @media (min-width: 761px) { .respaldo { grid-template-columns: 1fr auto; } .respaldo .aviso { grid-column: 1 / -1; } }
+  .respaldo h2 { margin-bottom: var(--s-1); }
+  .aviso:empty { display: none; }
+  .aviso { font-size: var(--t-s); font-weight: 600; color: var(--acento); }
+  .aviso[data-error] { color: var(--error); background: var(--error-bg); padding: var(--s-2) var(--s-3); border-radius: var(--r-s); }
+</style>

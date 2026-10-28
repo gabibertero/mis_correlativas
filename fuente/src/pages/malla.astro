@@ -1,0 +1,130 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MateriaCaja from '../components/MateriaCaja.astro';
+import { MATERIAS, NIVELES, ESTADOS } from '../data/plan.js';
+import { ETIQUETA, NOMBRE_NIVEL, estadoDe } from '../lib/vista.js';
+
+const porNivel = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel === nv).sort((a, b) => (a.n === 99 ? 1 : b.n === 99 ? -1 : a.n - b.n)) }));
+---
+<Layout titulo="Malla" descripcion="La malla de Ingeniería en Sistemas por nivel, con el estado de cada materia y sus correlativas.">
+  <header class="cab">
+    <p class="eyebrow">Plan 2023 · 5 niveles</p>
+    <h1>La malla</h1>
+    <p class="lead">Tocá una materia para ver de qué depende, qué destraba y cambiar su estado.</p>
+    <ul class="leyenda" aria-label="Referencias de color">
+      {['pendiente', 'cursando', 'recursando', 'regular', 'promocion', 'aprobada', 'libre', 'abandono'].map((e) => <li><span class="chip" data-estado={e}>{ETIQUETA[e]}</span></li>)}
+      <li><span class="hab">Habilitada para cursar</span></li>
+    </ul>
+  </header>
+
+  <p class="sin-js">Sin JavaScript la malla es solo de lectura: no se puede tocar una materia para ver sus correlativas.</p>
+  <div class="malla" id="malla" data-vista="malla">
+    {porNivel.map(({ nv, mats }) => {
+      const plan = mats.filter((m) => !m.opcional);
+      const ok = plan.filter((m) => estadoDe(m.n) === 'aprobada').length;
+      return (
+        <section class="nivel" data-nivel={nv} aria-labelledby={`nivel-${nv}`}>
+          <header>
+            <h2 id={`nivel-${nv}`}><span class="num">{nv}</span> {NOMBRE_NIVEL[nv]}</h2>
+            <p class="suave" data-nivel-avance><span class="num">{ok}</span>/{plan.length}</p>
+          </header>
+          <div class="cajas">{mats.map((m) => <MateriaCaja m={m} />)}</div>
+        </section>
+      );
+    })}
+  </div>
+
+  <!-- Panel de detalle: la lógica lo muestra y lo llena (data-campo / data-lista). -->
+  <aside id="panel-materia" class="panel" role="dialog" aria-modal="false" aria-labelledby="panel-titulo" hidden data-materia-activa="">
+    <div class="panel-cab">
+      <div>
+        <p class="eyebrow" data-campo="nivel"></p>
+        <h2 id="panel-titulo" data-campo="titulo"></h2>
+        <p class="suave" data-campo="meta"></p>
+      </div>
+      <button type="button" data-accion="cerrar-panel" aria-label="Cerrar panel">✕</button>
+    </div>
+    <div class="panel-cuerpo">
+      <div class="campos">
+        <label>Estado
+          <select data-campo="estado">
+            {ESTADOS.map((e) => <option value={e}>{ETIQUETA[e]}</option>)}
+          </select>
+        </label>
+        <label>Nota
+          <input type="number" min="1" max="10" step="1" inputmode="numeric" data-campo="nota" placeholder="—" />
+        </label>
+      </div>
+      <p class="veredicto" data-campo="veredicto" aria-live="polite"></p>
+      <div class="listas">
+        <section><h3>Para cursarla necesitás</h3><ul data-lista="requisitos"></ul></section>
+        <section><h3>Para rendir el final</h3><ul data-lista="falta-final"></ul></section>
+        <section><h3>Si la aprobás, destraba</h3><ul data-lista="destraba"></ul></section>
+      </div>
+    </div>
+  </aside>
+</Layout>
+
+<script>
+  import '../scripts/malla.js';
+</script>
+
+<style is:global>
+  .malla { display: grid; gap: var(--s-12); margin-top: var(--s-8); }
+  main:has(.malla) { max-width: 84rem; }
+  /* encabezado alineado con el logo (66rem); solo la grilla de 5 columnas usa el ancho extra */
+  main:has(.malla) > .cab, main:has(.malla) > .sin-js { max-width: calc(66rem - 2 * var(--s-4)); margin-inline: auto; }
+  main:has(.malla) > .cab { margin-bottom: 0; }
+  main:has(.malla) > .cab + .sin-js, main:has(.malla) > .sin-js { margin-top: var(--s-4); }
+  .leyenda { margin-top: var(--s-3); gap: var(--s-2) var(--s-3); }
+  .nivel { scroll-margin-top: 80px; }
+  .nivel > header { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-6); padding-bottom: var(--s-4); border-bottom: 2px solid var(--borde); }
+  .nivel > header p { font-size: var(--t-xs); font-weight: 700; padding: var(--s-1) var(--s-3); border-radius: 999px; background: var(--acento-suave); color: var(--acento); white-space: nowrap; }
+  .nivel h2 { font-size: var(--t-l); display: flex; align-items: center; gap: var(--s-2); }
+  .nivel h2 .num { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--acento); color: var(--sobre-acento); font-size: var(--t-m); }
+  .cajas { display: grid; gap: var(--s-4); }
+  @media (min-width: 540px) and (max-width: 1359px) { .cajas { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 800px) and (max-width: 1359px) { .cajas { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 1360px) {
+    .malla { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-6); align-items: start; }
+    .nivel > header { flex-direction: column; align-items: flex-start; gap: var(--s-2); }
+  }
+
+  /* Panel: bottom-sheet sobre la nav inferior (<1024); lateral fijo y la grilla le cede lugar (>=1024) */
+  .panel { position: fixed; z-index: 25; left: 0; right: 0; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); max-height: 60dvh; overflow-y: auto; overscroll-behavior: contain; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--r) var(--r) 0 0; box-shadow: 0 -8px 32px rgb(0 0 0 / .2); padding: 0 var(--s-4) var(--s-6); }
+  .panel-cab h2 { letter-spacing: -.02em; }
+  .panel:not([hidden]) { animation: panel-sube .35s var(--suave-ease) both; }
+  @keyframes panel-sube { from { transform: translateY(24px); opacity: 0; } }
+  @keyframes panel-entra { from { transform: translateX(32px); opacity: 0; } }
+  .panel::before { content: ''; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--borde-fuerte); margin: var(--s-2) auto 0; position: sticky; top: var(--s-2); }
+  main:has(.panel:not([hidden])) { padding-bottom: calc(60dvh + var(--s-8)); }
+  @media (min-width: 1024px) {
+    .panel { left: auto; top: var(--nav-h); bottom: 0; width: 24rem; max-height: none; border-radius: var(--r) 0 0 0; border-right: 0; padding-bottom: var(--s-8); }
+    .panel::before { display: none; }
+    .panel:not([hidden]) { animation-name: panel-entra; }
+    main:has(.panel:not([hidden])) { margin-right: 24rem; padding-bottom: var(--s-16); }
+  }
+  .mat { scroll-margin-bottom: calc(60dvh + var(--nav-h) + var(--s-4)); }
+  @media (min-width: 1024px) { .mat { scroll-margin-bottom: 0; } }
+  /* con el panel abierto entran menos columnas */
+  @media (min-width: 1360px) and (max-width: 1799px) { main:has(.panel:not([hidden])) .malla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-8) var(--s-6); } }
+  @media (min-width: 1024px) and (max-width: 1279px) { main:has(.panel:not([hidden])) .malla { grid-template-columns: repeat(2, minmax(0, 1fr)); } main:has(.panel:not([hidden])) .cajas { grid-template-columns: 1fr; } }
+  .panel-cab { position: sticky; top: 0; z-index: 1; background: var(--sup); display: flex; justify-content: space-between; gap: var(--s-3); align-items: start; padding: var(--s-3) 0; border-bottom: 1px solid var(--borde); }
+  .panel-cab button { flex: none; width: 44px; padding: 0; }
+  .panel-cab h2 { font-size: var(--t-xl); }
+  .panel-cuerpo { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
+  .campos { display: grid; grid-template-columns: 2fr 1fr; gap: var(--s-3); }
+  label { display: grid; gap: var(--s-1); font-size: var(--t-xs); font-weight: 700; color: var(--suave); }
+  select, input { font: inherit; font-size: var(--t-m); min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-s); border: 1px solid var(--borde-fuerte); background: var(--sup2); color: var(--texto); width: 100%; }
+  .veredicto { font-weight: 600; font-size: var(--t-s); padding: var(--s-3); border-radius: var(--r-s); background: var(--sup2); border-left: 4px solid var(--borde-fuerte); }
+  .veredicto:empty { display: none; }
+  .veredicto[data-tono='ok'] { border-left-color: var(--e-aprobada); }
+  .veredicto[data-tono='espera'] { border-left-color: var(--acento2); background: var(--acento2-suave); }
+  .veredicto[data-tono='ok'] { background: var(--acento-suave); }
+  .veredicto[data-tono='falta'] { border-left-color: var(--error); }
+  .listas { display: grid; gap: var(--s-4); }
+  .listas h3 { font-size: var(--t-m); margin-bottom: var(--s-2); }
+  .listas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); font-size: var(--t-s); }
+  .listas li:not(.vacio) { padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup2); border: 1px solid var(--borde); }
+  .listas .vacio { text-align: left; padding: var(--s-2) var(--s-3); }
+</style>

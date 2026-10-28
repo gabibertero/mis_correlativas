@@ -1,0 +1,82 @@
+---
+import { ETIQUETA, MODALIDAD, estadoDe, puedeCursar } from '../lib/vista.js';
+import { ESTADO_INICIAL } from '../data/plan.js';
+import { sinCursar } from '../lib/motor.js';
+const { m } = Astro.props;
+const estado = estadoDe(m.n);
+const nota = ESTADO_INICIAL[m.n]?.nota;
+const habilitada = sinCursar(estado) && puedeCursar(m);
+---
+<button type="button" class="mat" disabled data-materia={m.n} data-nivel={m.nivel} data-estado={estado} data-hs={m.hs} data-opcional={m.opcional ? 'si' : 'no'}
+  data-reg={m.reg.join(',')} data-aprob={m.aprob.join(',')} data-habilitada={habilitada ? 'si' : 'no'}
+  data-rel="" aria-haspopup="dialog" aria-controls="panel-materia">
+  <span class="mat-n" aria-hidden="true">{m.n === 99 ? 'S' : m.n}</span>
+  {m.opcional && <span class="mat-opc" data-opcional-etiqueta>Opcional · Analista</span>}
+  <span class="mat-nombre">{m.nombre}</span>
+  <span class="mat-meta">{m.hs}&nbsp;hs<span class="sep" aria-hidden="true">·</span>{MODALIDAD[m.modalidad]}{m.integradora && <><span class="sep" aria-hidden="true">·</span>Integradora</>}</span>
+  <span class="mat-estado">
+    <span class="chip" data-estado={estado}>{ETIQUETA[estado]}</span>
+    <span class="mat-nota" data-nota hidden={nota == null}>Nota <b class="num" data-nota-valor>{nota}</b></span>
+    <span class="mat-hab insignia-hab" hidden={!habilitada}>Podés cursar</span>
+  </span>
+</button>
+<style>
+  /* Cada estado se lee por color + relleno + borde (no solo por el ícono del chip). --mb borde, --mbg fondo, --ec acento izquierdo, --op opacidad. */
+  .mat { position: relative; overflow-wrap: break-word; --ec: var(--e-pendiente); --ebg: var(--e-pendiente-bg); display: grid; grid-template-columns: 40px minmax(0, 1fr); grid-template-areas: 'n opc' 'n nombre' 'n meta' 'n estado'; gap: var(--s-1) var(--s-4); align-items: start; text-align: left; width: 100%; padding: calc(var(--s-4) - 2px); padding-left: calc(var(--s-4) - 4px); border-radius: var(--r-s); border: 2px solid var(--mb, var(--borde)); border-left: 6px solid var(--ec); background: var(--mbg, var(--sup)); opacity: var(--op, 1); box-shadow: var(--sombra); font-weight: 400; min-height: 44px; color: var(--texto); transition: transform .2s var(--suave-ease), box-shadow .2s, opacity .3s, border-color .2s, filter .3s, background .2s; }
+  .mat:hover:not(:disabled) { border-color: var(--mb, var(--borde-fuerte)); border-left-color: var(--ec); box-shadow: var(--sombra-h); transform: translateY(-2px); }
+  .mat:active:not(:disabled) { transform: translateY(0) scale(.99); }
+
+  /* Aprobada: relleno verde pleno + tilde. Es lo "hecho". */
+  .mat[data-estado='aprobada'] { --ec: var(--m-ok-borde); --ebg: rgb(255 255 255 / .2); --mb: var(--m-ok-borde); --mbg: linear-gradient(135deg, var(--m-ok), var(--m-ok-2)); color: var(--m-ok-t); box-shadow: 0 4px 14px color-mix(in srgb, var(--m-ok) 30%, transparent); }
+  .mat[data-estado='aprobada'] .mat-n { color: var(--m-ok-t); }
+  .mat[data-estado='aprobada'] .mat-meta, .mat[data-estado='aprobada'] .mat-nota, .mat[data-estado='aprobada'] .mat-nota b { color: inherit; }
+  .mat[data-estado='aprobada'] .mat-meta { opacity: .85; }
+  .mat[data-estado='aprobada'] .chip { background: rgb(255 255 255 / .2); color: inherit; }
+  .mat[data-estado='aprobada'] .mat-nombre { padding-right: var(--s-6); }
+  .mat[data-estado='aprobada']::after { content: ''; position: absolute; top: var(--s-3); right: var(--s-3); width: 20px; height: 20px; background: var(--m-ok-t); mask: var(--i-tilde) center / contain no-repeat; -webkit-mask: var(--i-tilde) center / contain no-repeat; }
+
+  /* Rendible (regular / recursando / promoción): verde medio con borde marcado */
+  .mat:is([data-estado='regular'], [data-estado='recursando'], [data-estado='promocion']) { --mb: var(--m-rend-borde); --mbg: var(--m-rend-bg); --ec: var(--m-rend-borde); --ebg: var(--m-rend-n); }
+  .mat:is([data-estado='regular'], [data-estado='recursando'], [data-estado='promocion']) .mat-n { color: var(--m-rend-t); }
+
+  /* Cursando: anillo cian y barra de rayas que avanza (en curso) */
+  .mat[data-estado='cursando'] { --ec: var(--e-cursando); --ebg: var(--e-cursando-bg); --mb: var(--e-cursando); --mbg: linear-gradient(180deg, var(--e-cursando-bg), var(--sup) 70%); overflow: hidden; padding-bottom: calc(var(--s-4) + 2px); }
+  .mat[data-estado='cursando']::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: repeating-linear-gradient(135deg, var(--e-cursando) 0 6px, transparent 6px 12px); background-size: 17px 100%; animation: rayas 1.2s linear infinite; opacity: .8; }
+  @keyframes rayas { to { background-position: 17px 0; } }
+
+  .mat[data-estado='libre'], .mat[data-estado='abandono'] { --ec: var(--borde-fuerte); --ebg: var(--e-abandono-bg); --mb: var(--borde-fuerte); --mbg: var(--sup2); box-shadow: none; }
+  .mat[data-estado='libre'] .mat-n, .mat[data-estado='abandono'] .mat-n { color: var(--e-abandono); }
+  .mat[data-estado='abandono'] { border-left-style: dotted; }
+  .mat[data-estado='abandono'] .mat-nombre { color: var(--suave); text-decoration: line-through; text-decoration-thickness: 1px; }
+
+  /* Pendiente sin desbloquear: apagada, punteada y con candado, pero legible */
+  .mat:where([data-estado='pendiente'][data-habilitada='no']) { --op: .72; --mb: var(--borde-fuerte); --mbg: var(--sup2); --ec: var(--borde-fuerte); border-style: dashed; border-left-style: dashed; filter: saturate(.3); box-shadow: none; }
+  .mat:where([data-estado='pendiente'][data-habilitada='no']) .mat-nombre { padding-right: var(--s-6); }
+  .mat:where([data-estado='pendiente'][data-habilitada='no'])::after { content: ''; position: absolute; top: var(--s-3); right: var(--s-3); width: 16px; height: 16px; background: var(--suave); mask: var(--i-candado) center / contain no-repeat; -webkit-mask: var(--i-candado) center / contain no-repeat; }
+
+  /* Habilitada para cursar: la que invita. Borde verde pleno, aro que late, número sólido e insignia con rayo */
+  .mat[data-habilitada='si'] { --ec: var(--acento); --mb: var(--acento); --ebg: var(--acento); --mbg: linear-gradient(135deg, var(--acento-suave), var(--sup) 60%); box-shadow: 0 0 0 4px color-mix(in srgb, var(--marca) 22%, transparent), 0 6px 18px color-mix(in srgb, var(--marca) 28%, transparent); animation: brillo-hab 2.8s ease-in-out 3; }
+  .mat[data-habilitada='si'] .mat-n { background: var(--acento); color: var(--sobre-acento); }
+  @keyframes brillo-hab { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--marca) 10%, transparent), 0 6px 22px color-mix(in srgb, var(--marca) 38%, transparent); } }
+  .mat-n { grid-area: n; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--ebg); color: var(--ec); font: 800 var(--t-l)/1 var(--f-disp); font-variant-numeric: tabular-nums; transition: background .2s, color .2s; }
+  .mat-nombre { grid-area: nombre; font-weight: 600; font-size: var(--t-s); line-height: 1.35; }
+  .mat-meta { grid-area: meta; overflow-wrap: normal; font-size: var(--t-xs); color: var(--suave); }
+  .mat-opc { grid-area: opc; justify-self: start; font-size: var(--t-xs); font-weight: 700; padding: 0 var(--s-2); border-radius: var(--r-s); white-space: nowrap; background: var(--acento2-suave); color: var(--acento2); }
+  .mat:not([data-opcional='si']) { grid-template-areas: 'n nombre' 'n meta' 'n estado'; }
+  /* Opcional (Seminario): se ve como extra, no como una materia más del plan */
+  .mat[data-opcional='si'] { border-style: dashed; border-left-style: dashed; }
+  .mat[data-opcional='si'] .mat-n { border-radius: 50%; }
+  .mat-estado { grid-area: estado; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+  .mat-nota { font-size: var(--t-xs); color: var(--suave); }
+  .mat-nota b { color: var(--texto); }
+  .mat-hab { animation: subir .4s var(--suave-ease) both; }
+  /* Resaltado de correlatividad: lo setea la lógica con data-rel en cada caja */
+  .mat[data-rel='sel'] { outline: 3px solid var(--acento); outline-offset: 2px; opacity: 1; filter: none; }
+  .mat[data-rel='reg'], .mat[data-rel='aprob'] { opacity: 1; filter: none; border-color: var(--acento2); border-left-color: var(--acento2); box-shadow: 0 0 0 3px var(--acento2-suave), 0 4px 14px color-mix(in srgb, var(--azul-solido) 25%, transparent); animation: none; }
+  .mat[data-rel='destraba'] { opacity: 1; filter: none; border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); animation: none; }
+  .mat[data-rel='atenuada'] { opacity: min(.85, var(--op, 1)); filter: saturate(.5); box-shadow: none; animation: none; }
+  /* Sin JS va disabled (fuera del Tab); malla.js lo habilita. Se ve igual que con JS. */
+  .mat:disabled { cursor: default; }
+  html:not(.js) .mat { pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .mat, .mat::after { transition: none; animation: none !important; } .mat:hover:not(:disabled) { transform: none; } }
+</style>

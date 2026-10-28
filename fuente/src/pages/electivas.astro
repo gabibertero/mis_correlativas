@@ -1,0 +1,138 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { MODALIDAD, falta, nombreCorto, slug } from '../lib/vista.js';
+
+const lista = ELECTIVAS.map((e) => ({ ...e, id: slug(e.nombre), f: falta(e), ok: !falta(e).reg.length && !falta(e).aprob.length }));
+const habilitadas = lista.filter((e) => e.ok).length;
+---
+<Layout titulo="Electivas" descripcion="Las 19 electivas del plan con sus créditos, correlativas y si ya las podés cursar.">
+  <header class="cab">
+    <p class="eyebrow">{ELECTIVAS.length} materias electivas</p>
+    <h1>Electivas</h1>
+    <p class="lead">Sumá créditos: {CREDITOS_INGENIERIA} para Ingeniería, y {CREDITOS_ANALISTA} de tercer nivel para Analista.</p>
+  </header>
+
+  <section class="contador" aria-label="Créditos acumulados" data-vista="creditos">
+    <div class="cred card" data-creditos="ing">
+      <p class="cred-t">Ingeniería</p>
+      <p class="cred-n"><b class="num" data-valor>0</b><span class="de">/{CREDITOS_INGENIERIA}</span><span class="cred-u">créditos</span></p>
+      <progress max={CREDITOS_INGENIERIA} value="0" aria-label="Créditos para Ingeniería"></progress>
+    </div>
+    <div class="cred card" data-creditos="analista">
+      <p class="cred-t">Analista · 3er nivel</p>
+      <p class="cred-n"><b class="num" data-valor>0</b><span class="de">/{CREDITOS_ANALISTA}</span><span class="cred-u">créditos</span></p>
+      <progress max={CREDITOS_ANALISTA} value="0" aria-label="Créditos de tercer nivel para Analista"></progress>
+    </div>
+    <p class="suave sem-cred" data-seminario-creditos hidden>Incluye 6 créditos del Seminario Integrador (cuentan para Ingeniería, no para Analista).</p>
+  </section>
+
+  <section class="seccion" data-vista="electivas" aria-labelledby="h-lista">
+    <h2 id="h-lista" class="sr-only">Lista de electivas</h2>
+    <div class="filtros" hidden data-filtros>
+      <label class="buscar">Buscar
+        <input type="search" data-buscar placeholder="Nombre de la electiva" autocomplete="off" />
+      </label>
+      <div class="chips" role="group" aria-label="Filtrar electivas">
+        <button type="button" aria-pressed="true" data-filtro="todas">Todas</button>
+        <button type="button" aria-pressed="false" data-filtro="hab">Habilitadas</button>
+        <button type="button" aria-pressed="false" data-filtro="3">Nivel 3</button>
+        <button type="button" aria-pressed="false" data-filtro="4">Nivel 4</button>
+        <button type="button" aria-pressed="false" data-filtro="5">Nivel 5</button>
+      </div>
+    </div>
+    <p class="resumen suave" data-resumen-electivas role="status" aria-live="polite">Hoy podés cursar <b>{habilitadas}</b> de {ELECTIVAS.length}.</p>
+    <div class="tabla card">
+      <div class="tabla-cab" aria-hidden="true"><span>Electiva</span><span>Nivel</span><span>Créd.</span><span>Estado</span></div>
+      <ul class="filas">
+        {lista.map((e) => (
+          <li class="el" data-electiva={e.id} data-nivel={e.nivel} data-creditos={e.creditos} data-reg={e.reg.join(',')} data-aprob={e.aprob.join(',')} data-habilitada={e.ok ? 'si' : 'no'} data-estado="pendiente">
+            <div class="el-nom">
+              <h3>{e.nombre}</h3>
+              <p class="suave el-meta">{MODALIDAD[e.modalidad]}</p>
+            </div>
+            <span class="el-nv">N{e.nivel}</span>
+            <span class="cr"><b class="num">{e.creditos}</b><span class="cr-u"> cr.</span></span>
+            <p class="el-est">
+              {e.ok ? <span class="chip chip-hab">Habilitada</span> : <span class="chip" data-estado="pendiente">Bloqueada</span>}
+            </p>
+            {!e.ok && (
+              <ul class="faltan" data-faltan>
+                {e.f.reg.map((n) => <li>Regular: <b>{nombreCorto(n)}</b></li>)}
+                {e.f.aprob.map((n) => <li>Aprobada: <b>{nombreCorto(n)}</b></li>)}
+              </ul>
+            )}
+            <label class="sel" hidden><span class="sr-only">Estado de {e.nombre}</span>
+              <select data-campo="estado"><option value="pendiente">Pendiente</option><option value="cursando">Cursando</option><option value="aprobada">Aprobada</option></select>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <p class="vacio" data-sin-resultados hidden>Ninguna electiva coincide con el filtro.</p>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import '../scripts/electivas.js';
+  import '../scripts/electivas-filtro.js';
+</script>
+
+<style is:global>
+  .contador { display: grid; gap: var(--s-4); }
+  @media (min-width: 761px) { .contador { grid-template-columns: 1fr 1fr; } .contador > p { grid-column: 1 / -1; } }
+  .cred-t { font-size: var(--t-s); font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .06em; }
+  .cred-n { display: flex; align-items: baseline; gap: 2px; font-family: var(--f-disp); font-weight: 800; margin: var(--s-1) 0 var(--s-3); }
+  .cred-n .num { font-size: 3.5rem; line-height: 1; letter-spacing: -.03em; color: var(--acento); }
+  .cred-n .de { font-size: var(--t-xl); color: var(--suave); }
+  .cred-u { font-family: var(--f-ui); font-size: var(--t-s); font-weight: 600; color: var(--suave); margin-left: var(--s-2); }
+  .contador progress { height: 14px; }
+  .sem-cred { font-size: var(--t-s); }
+
+  .filtros { display: grid; gap: var(--s-3); margin-bottom: var(--s-3); }
+  @media (min-width: 761px) { .filtros { grid-template-columns: minmax(0, 20rem) 1fr; align-items: end; } }
+  .buscar { display: grid; gap: var(--s-1); font-size: var(--t-xs); font-weight: 700; color: var(--suave); }
+  .buscar input { font: inherit; font-size: var(--t-m); min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-s); border: 1px solid var(--borde-fuerte); background: var(--sup); color: var(--texto); width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .chips button { padding: 0 var(--s-4); }
+  .chips button[aria-pressed='true'] { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+  .resumen { font-size: var(--t-s); margin-bottom: var(--s-3); }
+  .resumen b { color: var(--acento); font-size: var(--t-m); }
+
+  .tabla { padding: 0; overflow: hidden; }
+  .tabla-cab { display: none; }
+  .filas { list-style: none; margin: 0; padding: 0; }
+  .el { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'nom nv cr' 'est sel sel' 'falta falta falta'; gap: var(--s-2) var(--s-3); align-items: center; padding: var(--s-3) var(--s-4); border-top: 1px solid var(--borde); border-left: 4px solid transparent; transition: background .15s, border-color .15s; }
+  .el:first-child { border-top: 0; }
+  .el:hover { background: var(--sup2); }
+  .el[hidden] { display: none; }
+  .el[data-habilitada='si'][data-estado='pendiente'] { border-left-color: var(--acento); background: linear-gradient(90deg, var(--acento-suave), transparent 55%); }
+  .el[data-estado='aprobada'] { border-left-color: var(--e-aprobada); }
+  .el[data-estado='cursando'] { border-left-color: var(--e-cursando); }
+  .el-nom { grid-area: nom; min-width: 0; }
+  .el h3 { font-size: var(--t-s); line-height: 1.3; font-weight: 700; }
+  .el-meta { font-size: var(--t-xs); }
+  .el-nv { grid-area: nv; font-size: var(--t-xs); font-weight: 800; padding: 0 var(--s-2); border-radius: 8px; background: var(--e-pendiente-bg); color: var(--texto); }
+  .cr { grid-area: cr; justify-self: end; font-size: var(--t-xs); font-weight: 700; padding: var(--s-1) var(--s-3); border-radius: 999px; background: var(--acento2-suave); color: var(--acento2); white-space: nowrap; text-align: center; }
+  .cr b { font-size: var(--t-s); }
+  .el-est { grid-area: est; margin: 0; }
+  .chip-hab { background: var(--acento); color: var(--sobre-acento); }
+  .chip-hab::before { content: ''; width: 12px; height: 12px; background: currentColor; mask: var(--i-rayo) center / contain no-repeat; -webkit-mask: var(--i-rayo) center / contain no-repeat; border-radius: 0; }
+  .faltan { grid-area: falta; list-style: none; display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-2); margin: 0; padding: 0; font-size: var(--t-xs); color: var(--suave); }
+  .faltan li { padding: 0 var(--s-2); border-radius: 6px; background: var(--e-pendiente-bg); }
+  .faltan b { color: var(--texto); font-weight: 600; }
+  .sel { grid-area: sel; margin: 0; }
+  select { font: inherit; min-height: 44px; padding: 0 var(--s-3); border-radius: var(--r-s); border: 1px solid var(--borde-fuerte); background: var(--sup2); color: var(--texto); }
+  .sel select { width: 100%; }
+  .tabla .vacio { margin: var(--s-4); }
+
+  @media (min-width: 761px) {
+    .tabla-cab, .el { grid-template-columns: minmax(0, 1fr) 56px 76px 112px 148px; }
+    .tabla-cab { display: grid; gap: var(--s-3); padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) + 4px); background: var(--sup2); border-bottom: 1px solid var(--borde); font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
+    .tabla-cab span:nth-child(3) { text-align: center; }
+    .el { grid-template-areas: 'nom nv cr est sel' 'falta falta falta falta falta'; padding-block: var(--s-2); }
+    .el-nv { justify-self: start; }
+    .el-est { justify-self: start; }
+    .cr { justify-self: center; } .sel select { width: 100%; }
+  }
+</style>

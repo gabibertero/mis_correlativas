@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { MATERIAS, NIVELES } from '../data/plan.js';
+import { ETIQUETA, NOMBRE_NIVEL, estadoDe } from '../lib/vista.js';
+
+const ordenar = (a, b) => (a.n === 99 ? 1 : b.n === 99 ? -1 : a.n - b.n);
+const hechas = MATERIAS.filter((m) => estadoDe(m.n) === 'aprobada').sort(ordenar);
+// Se renderizan TODAS las materias: la lógica oculta las ya aprobadas según el estado guardado.
+const grupos = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel === nv).sort(ordenar) }));
+---
+<Layout titulo="Simulador" descripcion="Probá qué pasaría si aprobás o regularizás ciertas materias, sin tocar tu estado real.">
+  <header class="cab">
+    <p class="eyebrow">Modo hipotético</p>
+    <h1>¿Y si…?</h1>
+    <p class="lead">Marcá materias como regulares o aprobadas de prueba y mirá qué se desbloquea. Tu estado real no se toca.</p>
+  </header>
+
+  <div class="sim" data-vista="simulador">
+    <aside class="resultado card" aria-labelledby="h-res" data-sim-resultado>
+      <div class="res-cab">
+        <h2 id="h-res">Qué se desbloquea</h2>
+        <button type="button" data-accion="reset-simulacion" hidden>Volver a mi estado real</button>
+      </div>
+      <p class="suave" data-sim-resumen aria-live="polite">Todavía no marcaste nada. Elegí una materia de la lista.</p>
+      <div class="res-listas" hidden>
+        <section><h3>Podrías cursar</h3><ul data-sim-lista="cursar"></ul></section>
+        <section><h3>Podrías rendir el final</h3><ul data-sim-lista="finales"></ul></section>
+      </div>
+    </aside>
+
+    <div class="lista">
+      <p class="sin-js">El simulador necesita JavaScript para probar materias. Activalo en tu navegador y recargá.</p>
+      {grupos.map(({ nv, mats }) => (
+        <section class="grupo" data-nivel={nv} aria-labelledby={`sim-n${nv}`} hidden={mats.every((m) => estadoDe(m.n) === 'aprobada')}>
+          <h2 id={`sim-n${nv}`}>{NOMBRE_NIVEL[nv]}</h2>
+          {mats.map((m) => {
+            const e = estadoDe(m.n);
+            const opciones = [['real', 'Como está'], ['regular', 'Regular'], ['aprobada', 'Aprobada']];
+            return (
+              <fieldset class="fila" data-sim-materia={m.n} data-estado-real={e} hidden={e === 'aprobada'}>
+                <legend class="sr-only">{m.nombre}</legend>
+                <p class="fila-info"><span class="n num">{m.n === 99 ? 'S' : m.n}</span><span class="fila-nombre">{m.nombre}</span><span class="chip" data-estado={e}>{ETIQUETA[e]}</span></p>
+                <div class="seg" data-solo-js role="radiogroup" aria-label={`Estado de prueba de ${m.nombre}`}>
+                  {opciones.map(([v, t], i) => (
+                    <label hidden={v === 'regular' && e === 'regular'}><input type="radio" name={`sim-${m.n}`} value={v} checked={i === 0} /><span>{t}</span></label>
+                  ))}
+                </div>
+              </fieldset>
+            );
+          })}
+        </section>
+      ))}
+      <details class="hechas">
+        <summary>Ya aprobadas (<span data-hechas-n>{hechas.length}</span>)</summary>
+        <ul>{MATERIAS.slice().sort(ordenar).map((m) => <li data-materia={m.n} hidden={estadoDe(m.n) !== 'aprobada'}><span class="n num">{m.n}</span>{m.nombre}</li>)}</ul>
+      </details>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import '../scripts/simulador.js';
+</script>
+
+<style is:global>
+  .sim { display: grid; gap: var(--s-6); }
+  .resultado { border-top: 4px solid var(--acento2); background: linear-gradient(170deg, var(--acento2-suave), var(--sup) 40%); }
+  @media (min-width: 900px) { .sim { grid-template-columns: 1fr 22rem; align-items: start; } .resultado { order: 2; position: sticky; top: 80px; } }
+  .res-cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-3); align-items: center; margin-bottom: var(--s-3); }
+  .res-cab h2 { font-size: var(--t-l); }
+  .res-listas { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
+  .res-listas h3 { font-size: var(--t-m); margin-bottom: var(--s-2); }
+  .res-listas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
+  .res-listas li:not(.vacio) { display: flex; align-items: center; gap: var(--s-3); line-height: 1.3; font-weight: 600; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); animation: subir .35s var(--suave-ease) both; }
+  .res-listas section:first-child .n { background: var(--acento); color: var(--sobre-acento); }
+  .res-listas small { display: block; color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
+  .res-listas .vacio { text-align: left; }
+  .grupo { margin-bottom: var(--s-8); }
+  .grupo h2 { font-size: var(--t-l); padding-bottom: var(--s-3); margin-bottom: var(--s-3); border-bottom: 2px solid var(--borde); }
+  .fila { border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup); padding: var(--s-3); margin: 0 0 var(--s-2); display: grid; gap: var(--s-3); box-shadow: var(--sombra); min-width: 0; transition: border-color .2s, box-shadow .2s, transform .2s var(--suave-ease); }
+  .fila:hover, .fila:focus-within { border-color: var(--borde-fuerte); box-shadow: var(--sombra-h); }
+  @media (min-width: 640px) { .fila { grid-template-columns: 1fr auto; align-items: center; } }
+  .fila-info { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-3); min-width: 0; }
+  .fila-nombre { font-weight: 600; font-size: var(--t-s); flex: 1 1 10rem; line-height: 1.3; }
+  .seg { display: flex; border: 1px solid var(--borde-fuerte); border-radius: 999px; overflow: hidden; background: var(--sup2); }
+  .seg label { flex: 1; position: relative; }
+  .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+  .seg span { display: grid; place-items: center; min-height: 44px; padding: 0 var(--s-3); font-size: var(--t-s); font-weight: 600; color: var(--suave); white-space: nowrap; }
+  .seg span { transition: background .2s, color .2s; }
+  .seg label:hover span { background: var(--acento2-suave); color: var(--acento2); }
+  .seg input:checked + span { background: var(--azul-solido); color: var(--sobre-azul); }
+  .seg input:focus-visible + span { outline: 3px solid var(--acento); outline-offset: -3px; border-radius: 999px; }
+  .hechas { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--r-s); padding: var(--s-1) var(--s-4); }
+  .hechas summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+  .hechas ul { list-style: none; padding: 0 0 var(--s-3); margin: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
+  .hechas li { display: flex; align-items: center; gap: var(--s-3); }
+  .hechas[open] summary { color: var(--acento); }
+</style>
