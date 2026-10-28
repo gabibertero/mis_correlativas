@@ -83,6 +83,8 @@ Reemplaza una planilla de Google por una app estática, rápida y pensada para e
 - Al tocar una materia se resalta de qué depende y qué habilita (directa e indirectamente).
 - Panel para ver qué te falta para cursar o rendir el final, y para cambiar estado y nota.
 
+<img alt="Demo de la malla: tocar una materia resalta sus correlativas y abre el panel" src="assets/readme/demo-malla.gif" width="100%">
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/malla-top-oscuro.png">
   <img alt="Malla de materias" src="assets/readme/malla-top-claro.png" width="100%">
@@ -98,6 +100,8 @@ Reemplaza una planilla de Google por una app estática, rápida y pensada para e
 - Arrastrá materias y electivas a cuatrimestres; avisa si no cumplís las correlativas o si te pasás de horas.
 - Propuesta automática de plan, priorizando lo que más destraba.
 - Finales por turno, ordenados por impacto.
+
+<img alt="Demo del planificador: proponer plan y mover una materia de cuatrimestre" src="assets/readme/demo-planificador.gif" width="100%">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/planificador-oscuro.png">
@@ -210,9 +214,9 @@ npx playwright test --config tests/playwright.config.mjs   # E2E
 - [x] Electivas en el planificador y tabla filtrable
 - [x] Exportar e importar estado
 - [x] Tema claro/oscuro y mobile-first
-- [ ] Activar GitHub Pages
+- [x] Activar GitHub Pages
 - [ ] Cargar fechas de mesas de febrero/marzo y julio 2027
-- [ ] GIFs de demo en este README
+- [x] GIFs de demo en este README
 
 ## ❓ FAQ
 
