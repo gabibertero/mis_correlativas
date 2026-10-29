@@ -122,6 +122,19 @@ Reemplaza una planilla de Google por una app estática, rápida y pensada para e
 - **Mi cuenta**: tu nombre (aparece junto al ícono de persona y en el saludo del Inicio), **8 temas de color**, modo claro/oscuro; todo se guarda en la cuenta.
 - Una cuenta nueva **arranca en blanco**.
 
+<p align="center">
+  <img alt="Pantalla de login sobre fondo verde" src="assets/readme/login-verde.png" width="62%">
+  &nbsp;
+  <img alt="Login en celular" src="assets/readme/login-verde-movil.png" width="22%">
+</p>
+
+<table>
+<tr>
+<td width="50%" align="center"><img alt="Mi cuenta en modo claro: nombre y 8 temas de color" src="assets/readme/mi-cuenta-claro.png" width="100%"><br><sub>Mi cuenta (claro)</sub></td>
+<td width="50%" align="center"><img alt="Mi cuenta en modo oscuro: nombre y 8 temas de color" src="assets/readme/mi-cuenta-oscuro.png" width="100%"><br><sub>Mi cuenta (oscuro)</sub></td>
+</tr>
+</table>
+
 </details>
 
 <details>
