@@ -103,30 +103,33 @@ export const ESTADOS = ['pendiente', 'cursando', 'recursando', 'regular', 'promo
 // Solo se usa como semilla la PRIMERA vez; después manda localStorage.
 // Las "directas a confirmar" (AGA, Física II, COM, Legislación) van como cursando
 // hasta que se confirmen; los exámenes de diciembre están en EXAMENES.
+// NO es el estado inicial de la app: cada cuenta arranca sin materias marcadas (ver `semilla()` en
+// progreso.js). Esto es el progreso histórico de Gabi, usado solo como fixture en los tests del motor.
+// Lo importan únicamente los tests, así que el bundle del cliente lo descarta (tree-shaking).
 export const ESTADO_INICIAL = {
   // n: { estado, nota? }
   1:  { estado: 'aprobada', nota: 6 },
-  2:  { estado: 'recursando' },            // AGA — regular y recursando; finales 2/12 o 16/12 de respaldo (ex directa probable); finales 2/12 o 16/12 de respaldo
+  2:  { estado: 'recursando' },
   3:  { estado: 'aprobada', nota: 6 },
   4:  { estado: 'aprobada', nota: 8 },
   5:  { estado: 'aprobada', nota: 8 },
   6:  { estado: 'aprobada', nota: 9 },
   7:  { estado: 'aprobada', nota: 6 },
   8:  { estado: 'aprobada', nota: 9 },
-  9:  { estado: 'cursando' },              // AM II — final 15/12
-  10: { estado: 'cursando' },              // Física II — directa pendiente
+  9:  { estado: 'cursando' },
+  10: { estado: 'cursando' },
   11: { estado: 'aprobada', nota: 10 },
   12: { estado: 'aprobada', nota: 7 },
   13: { estado: 'aprobada', nota: 8 },
   14: { estado: 'aprobada', nota: 9 },
-  15: { estado: 'regular' },               // SO
-  16: { estado: 'regular' },               // ASI
+  15: { estado: 'regular' },
+  16: { estado: 'regular' },
   17: { estado: 'aprobada', nota: 7 },
-  18: { estado: 'pendiente' },             // Economía — equivalencia 30/11 y 14/12 (no la cursa)
+  18: { estado: 'pendiente' },
   19: { estado: 'aprobada', nota: 7 },
   20: { estado: 'aprobada', nota: 8 },
-  21: { estado: 'cursando' },              // COM — directa pendiente
-  24: { estado: 'cursando' },              // Legislación — directa pendiente (nota sin subir)
+  21: { estado: 'cursando' },
+  24: { estado: 'cursando' },
 };
 
 // Mesas de examen / exámenes planificados (turno diciembre 2026).

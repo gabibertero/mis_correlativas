@@ -1,7 +1,7 @@
 // Persistencia en localStorage (prefijo `corr:v1:`) + exportar/importar. ÚNICO lugar que toca localStorage
 // (salvo el tema, que lo maneja el Layout). Siempre en try/catch: si está bloqueado o roto, la app sigue
 // funcionando en memoria durante la visita.
-import { MATERIAS, ELECTIVAS, ESTADOS, ESTADO_INICIAL } from '../data/plan.js';
+import { MATERIAS, ELECTIVAS, ESTADOS } from '../data/plan.js';
 import { slug, admiteNota } from './motor.js';
 
 export const PREFIJO = 'corr:v1:';
@@ -94,7 +94,7 @@ export const limpiarTemaColor = (x) => (TEMAS_COLOR.includes(x) ? x : 'verde');
 export const limpiarTemaModo = (x) => (x === 'claro' || x === 'oscuro' ? x : null);
 
 // ---------- Carga / guardado ----------
-const semilla = () => limpiarEstado(JSON.parse(JSON.stringify(ESTADO_INICIAL)));
+const semilla = () => ({}); // cada cuenta arranca sin materias marcadas; el progreso vive en la cuenta
 export function cargarEstado() {
   const g = leer('estado');
   return esObj(g) ? limpiarEstado(g) : semilla(); // nada guardado (o roto) -> semilla

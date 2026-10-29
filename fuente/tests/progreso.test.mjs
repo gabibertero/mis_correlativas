@@ -1,16 +1,13 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { ESTADO_INICIAL } from '../src/data/plan.js';
 import * as P from '../src/lib/progreso.js';
 
 const falso = () => { const d = {}; return { d, getItem: (k) => (k in d ? d[k] : null), setItem: (k, v) => { d[k] = String(v); } }; };
 beforeEach(() => P.usarAlmacen(falso()));
 
-test('sin nada guardado -> semilla; la app funciona', () => {
+test('sin nada guardado -> semilla vacía; la app funciona', () => {
   const est = P.cargarEstado();
-  assert.equal(est[1].estado, 'aprobada');
-  assert.equal(est[1].nota, 6);
-  assert.equal(Object.keys(est).length, Object.keys(ESTADO_INICIAL).length);
+  assert.deepEqual(est, {}); // semilla vacía: cada cuenta arranca sin materias marcadas
   assert.equal(P.cargarPlan(), null);
   assert.deepEqual(P.cargarFechas(), {});
   assert.deepEqual(P.cargarElectivas(), {});
@@ -31,19 +28,19 @@ test('estado guardado vacío ({}) NO vuelve a la semilla (el usuario lo borró)'
 test('localStorage roto o bloqueado: no tira, sigue en memoria', () => {
   const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('lleno'); } };
   P.usarAlmacen(roto);
-  assert.equal(P.cargarEstado()[1].estado, 'aprobada'); // semilla
+  assert.deepEqual(P.cargarEstado(), {}); // semilla vacía
   assert.equal(P.guardarEstado({ 2: { estado: 'regular' } }), false);
   assert.deepEqual(P.cargarEstado(), { 2: { estado: 'regular' } }); // memoria durante la visita
   P.usarAlmacen(null);
-  assert.equal(P.cargarEstado()[1].estado, 'aprobada');
+  assert.deepEqual(P.cargarEstado(), {});
 });
 
 test('JSON corrupto o de otro tipo -> semilla', () => {
   const a = falso(); P.usarAlmacen(a);
   a.d['corr:v1:estado'] = '{no es json';
-  assert.equal(P.cargarEstado()[1].estado, 'aprobada');
+  assert.deepEqual(P.cargarEstado(), {});
   a.d['corr:v1:estado'] = '[1,2,3]';
-  assert.equal(P.cargarEstado()[1].estado, 'aprobada');
+  assert.deepEqual(P.cargarEstado(), {});
 });
 
 test('limpiarEstado descarta basura y valida notas', () => {
