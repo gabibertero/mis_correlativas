@@ -86,7 +86,7 @@ test('importar rechaza archivos inválidos con mensaje', () => {
 test('importar acepta estado vacío y sanea partes opcionales rotas', () => {
   const v = P.validarImport('{"app":"correlativas","version":1,"estado":{},"plan":"roto","fechas":[1],"electivas":7}');
   assert.ok(v.ok);
-  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, electivas: {}, nombre: '', temaColor: 'verde', temaModo: null });
+  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, finales: {}, electivas: {}, nombre: '', temaColor: 'verde', temaModo: null });
 });
 
 test('limpiarPlan acepta electivas (e:<slug>) y descarta ids inventados', async () => {
@@ -152,4 +152,24 @@ test('perfil: viaja en export/import y se sanea', () => {
   assert.deepEqual([sucio.datos.nombre, sucio.datos.temaColor, sucio.datos.temaModo], ['', 'verde', null]);
   P.usarAlmacen(falso()); P.aplicarImport(v.datos);
   assert.deepEqual([P.cargarNombre(), P.cargarTemaColor(), P.cargarTemaModo()], ['Gabi', 'rosa', 'oscuro']);
+});
+
+test('limpiarFinales: valida Nº de materia y fecha, descarta basura', () => {
+  assert.deepEqual(P.limpiarFinales({ 9: '2026-12-15', 2: '2026-12-02' }), { 2: '2026-12-02', 9: '2026-12-15' });
+  assert.deepEqual(P.limpiarFinales({ 999: '2026-12-15', x: '2026-12-15', 9: '2026-02-30', 2: 'mañana', 3: 5, 4: null }), {});
+  for (const basura of [null, undefined, 7, 'x', [], [1]]) assert.deepEqual(P.limpiarFinales(basura), {});
+});
+test('finales: ida y vuelta export/import', () => {
+  const v = P.validarImport(JSON.stringify({ app: 'correlativas', version: 1, estado: {}, finales: { 9: '2026-12-15', 77: '2026-12-15' } }));
+  assert.deepEqual(v.datos.finales, { 9: '2026-12-15' });
+  assert.deepEqual(P.validarImport('{"app":"correlativas","version":1,"estado":{}}').datos.finales, {});
+});
+test('finales: guardar -> armarExport -> aplicarImport en otro almacén', () => {
+  P.guardarFinales({ 9: '2026-12-15' });
+  const ex = P.armarExport();
+  assert.deepEqual(ex.finales, { 9: '2026-12-15' });
+  P.usarAlmacen(falso());
+  assert.deepEqual(P.cargarFinales(), {});
+  P.aplicarImport(P.validarImport(JSON.stringify(ex)).datos);
+  assert.deepEqual(P.cargarFinales(), { 9: '2026-12-15' });
 });

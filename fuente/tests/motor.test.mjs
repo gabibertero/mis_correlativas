@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MATERIAS, ELECTIVAS, ESTADOS, ESTADO_INICIAL, EXAMENES } from '../src/data/plan.js';
+import { MATERIAS, ELECTIVAS, ESTADOS, ESTADO_INICIAL } from '../src/data/plan.js';
 import * as M from '../src/lib/motor.js';
+
+// Fixture: mesas de diciembre 2026 de Gabi (en la app viven en la cuenta como `finales`, ya no en plan.js).
+const EXAMENES = [
+  { fecha: '2026-11-30', materia: 18, tipo: 'equivalencia', etiqueta: 'Equivalencia · 1ª oportunidad' },
+  { fecha: '2026-12-02', materia: 2,  tipo: 'final',        etiqueta: 'Final · opción 1', opcional: true },
+  { fecha: '2026-12-14', materia: 18, tipo: 'equivalencia', etiqueta: 'Equivalencia · 2ª oportunidad' },
+  { fecha: '2026-12-15', materia: 9,  tipo: 'final',        etiqueta: 'Final' },
+  { fecha: '2026-12-16', materia: 2,  tipo: 'final',        etiqueta: 'Final · opción 2', opcional: true },
+];
 
 const T = (...ns) => Object.fromEntries(ns.map((n) => [n, { estado: 'aprobada' }]));
 const todas = () => T(...MATERIAS.map((m) => m.n));
@@ -583,4 +592,15 @@ test('planProximoAnio: 1C y 2C 2027 con razón y orden de proponerPlan', () => {
   assert.ok(p[0].items.length > 0);
   assert.match(M.razonEntrada(1), /anual/i);
   assert.equal(M.planProximoAnio({}).length, 2);
+});
+
+test('examenesDeFinales: arma exámenes desde finales de la cuenta', () => {
+  assert.deepEqual(M.examenesDeFinales({}), []);
+  assert.deepEqual(M.examenesDeFinales(undefined), []);
+  const ex = M.examenesDeFinales({ 9: '2026-12-15', 2: '2026-12-02' });
+  assert.deepEqual(ex.map((e) => [e.materia, e.fecha, e.tipo]).sort(), [[2, '2026-12-02', 'final'], [9, '2026-12-15', 'final']]);
+  const hoy = new Date(2026, 10, 27);
+  assert.equal(M.proximaMesa(ex, {}, {}, hoy).materia, 2);
+  assert.equal(M.proximaMesa(ex, {}, T(2), hoy).materia, 9); // aprobada: se saltea
+  assert.equal(M.proximaMesa(M.examenesDeFinales({}), {}, {}, hoy), null); // cuenta nueva: sin mesas
 });

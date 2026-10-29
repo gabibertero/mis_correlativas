@@ -1,7 +1,7 @@
 // Dashboard: KPIs, avance por nivel, créditos, "qué puedo hacer ahora", cuenta regresiva, exportar/importar.
-import { EXAMENES, ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
 import * as M from '../lib/motor.js';
-import { cargarEstado, cargarFechas, cargarElectivas, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
+import { cargarEstado, cargarFechas, cargarFinales, cargarElectivas, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
 import { $, $$, el, etiquetaN, filaMateria, vacio, fmtFecha } from './comun.js';
 
 const reemplazarLista = (cont, items, textoVacio) => {
@@ -69,16 +69,17 @@ function pintar() {
       el('span', {}, it.electiva ? 'Electiva' : M.nombreCorto(it.n), el('small', { dataset: { razon: '' } }, it.razon)))), 'Sin materias propuestas.');
   }
 
+  const examenes = M.examenesDeFinales(cargarFinales());
   // Próximos finales confirmados (ascendente desde hoy)
   const lf = $('[data-proximos-finales]');
-  lf.replaceChildren(...M.proximosFinales(EXAMENES, est).map((e) => el('li', { dataset: { materia: e.materia, fecha: e.fecha, tipo: e.tipo, ...(e.opcional && { opcional: 'si' }) } },
+  lf.replaceChildren(...M.proximosFinales(examenes, est).map((e) => el('li', { dataset: { materia: e.materia, fecha: e.fecha, tipo: e.tipo, ...(e.opcional && { opcional: 'si' }) } },
     el('time', { datetime: e.fecha }, fmtFecha(M.parseFecha(e.fecha))), el('strong', {}, M.nombreCorto(e.materia)), el('small', {}, e.etiqueta))));
 
   // Cuenta regresiva
   const sec = $('#cuenta-regresiva');
   $$('[data-countdown], p.vacio', sec).forEach((n) => n.remove());
-  const p = M.proximaMesa(EXAMENES, cargarFechas(), est);
-  if (!p) { lf.before(el('p', { class: 'vacio' }, 'No hay mesas cargadas. Sumalas desde el Planificador.')); return; }
+  const p = M.proximaMesa(examenes, cargarFechas(), est);
+  if (!p) { lf.before(el('p', { class: 'vacio' }, 'No hay mesas cargadas. Poné la fecha del final en cada materia, en la Malla.')); return; }
   lf.before(el('div', { dataset: { countdown: '', fecha: p.fecha, materia: p.materia ?? '' } },
     el('p', { class: 'cuenta-n' }, el('span', { class: 'num', dataset: { dias: '' } }, String(p.dias)), el('span', {}, p.dias === 1 ? 'día' : p.dias === 0 ? 'hoy' : 'días')),
     el('p', { class: 'cuenta-m' }, el('strong', {}, p.materia ? M.nombreCorto(p.materia) : p.etiqueta)),

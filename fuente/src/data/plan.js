@@ -102,7 +102,7 @@ export const ESTADOS = ['pendiente', 'cursando', 'recursando', 'regular', 'promo
 // Estado inicial de Gabi (seteo conservador, entrevista 2026-10-27).
 // Solo se usa como semilla la PRIMERA vez; después manda localStorage.
 // Las "directas a confirmar" (AGA, Física II, COM, Legislación) van como cursando
-// hasta que se confirmen; los exámenes de diciembre están en EXAMENES.
+// hasta que se confirmen; las fechas de final viven en la cuenta (`finales`).
 // NO es el estado inicial de la app: cada cuenta arranca sin materias marcadas (ver `semilla()` en
 // progreso.js). Esto es el progreso histórico de Gabi, usado solo como fixture en los tests del motor.
 // Lo importan únicamente los tests, así que el bundle del cliente lo descarta (tree-shaking).
@@ -132,16 +132,8 @@ export const ESTADO_INICIAL = {
   24: { estado: 'cursando' },
 };
 
-// Mesas de examen / exámenes planificados (turno diciembre 2026).
-// `tipo`: 'final' | 'equivalencia'. `opcion`: alternativa (rendís una de las fechas).
-// Las fechas de febrero/marzo y julio 2027 todavía no están: se cargan desde la web.
-export const EXAMENES = [
-  { fecha: '2026-11-30', materia: 18, tipo: 'equivalencia', etiqueta: 'Equivalencia · 1ª oportunidad' },
-  { fecha: '2026-12-02', materia: 2,  tipo: 'final',        etiqueta: 'Final · opción 1 (si no sale directa)', opcional: true },
-  { fecha: '2026-12-14', materia: 18, tipo: 'equivalencia', etiqueta: 'Equivalencia · 2ª oportunidad (si va mal el 30/11)' },
-  { fecha: '2026-12-15', materia: 9,  tipo: 'final',        etiqueta: 'Final' },
-  { fecha: '2026-12-16', materia: 2,  tipo: 'final',        etiqueta: 'Final · opción 2 (si no sale directa)', opcional: true },
-];
+// Las fechas de final ya no son un dato fijo: cada cuenta carga las suyas (clave `finales` en progreso.js).
+export const EXAMENES = [];
 
 // Materias que Gabi espera "sacar directa" (promoción sin final) — pendientes de confirmar.
 export const DIRECTAS_A_CONFIRMAR = [2, 10, 21, 24];

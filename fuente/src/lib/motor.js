@@ -200,6 +200,8 @@ export function diasHasta(iso, hoy = new Date()) {
   const h = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   return Math.round((parseFecha(iso) - h) / 86400000);
 }
+/** Fechas de final de la cuenta ({ Nº: 'YYYY-MM-DD' }) -> lista de exámenes para proximosFinales/proximaMesa. */
+export const examenesDeFinales = (finales) => Object.entries(finales ?? {}).map(([n, fecha]) => ({ fecha, materia: Number(n), tipo: 'final', etiqueta: 'Final' }));
 /** Mesas confirmadas (hoy o futuras) de materias no aprobadas, de la más próxima a la más lejana. */
 export function proximosFinales(examenes, est, hoy = new Date()) {
   return examenes.filter((e) => !aprobada(est, e.materia))

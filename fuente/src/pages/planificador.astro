@@ -1,18 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { MATERIAS, EXAMENES } from '../data/plan.js';
+import { MATERIAS } from '../data/plan.js';
 import { CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
-import { ETIQUETA, estadoDe, destraba, nombreCorto, porN } from '../lib/vista.js';
+import { ETIQUETA, estadoDe, porN } from '../lib/vista.js';
 
 const HS_LIMITE = 30; // shortcut: umbral de sobrecarga provisorio, lo define Gabi/`web`.
 const enCurso = MATERIAS.filter((m) => estadoDe(m.n) === 'cursando');
 const nombreCuatri = (id) => `${id.slice(5, 6)}º cuatrimestre ${id.slice(0, 4)}`;
 const cuatris = CUATRIS.map((id, i) => ({ id, nombre: nombreCuatri(id), actual: i === 0, extra: i >= CUATRIS_VISIBLES, mats: i === 0 ? enCurso : [] }));
-const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-const fmt = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric', month: 'long' });
-const dic = EXAMENES.map((e) => ({ ...e, d: new Date(`${e.fecha}T00:00:00`), impacto: destraba(e.materia).size })).sort((a, b) => a.d - b.d);
 const turnos = [
-  { id: 'dic-2026', nombre: 'Diciembre 2026', filas: dic },
+  { id: 'finales', nombre: 'Finales con fecha', filas: [] }, // las llena el JS desde `finales` de la cuenta
   { id: 'feb-mar-2027', nombre: 'Febrero / marzo 2027', filas: [] },
   { id: 'jul-2027', nombre: 'Julio 2027', filas: [] },
 ];
@@ -67,30 +64,14 @@ const turnos = [
       {turnos.map((t) => (
         <article class="turno card" data-turno={t.id}>
           <h3>{t.nombre}</h3>
-          {t.filas.length ? (
-            <ul class="examenes">
-              {t.filas.map((e) => {
-                const dias = Math.round((e.d - hoy) / 86400000);
-                return (
-                  <li class="examen" data-examen data-fecha={e.fecha} data-materia={e.materia} data-tipo={e.tipo} data-opcional={e.opcional ? 'si' : 'no'} data-impacto={e.impacto}>
-                    <time class="fecha" datetime={e.fecha}><span class="num">{e.d.getDate()}</span>{fmt.format(e.d).split(' ').slice(-1)[0].slice(0, 3)}</time>
-                    <span class="ex-info"><strong>{nombreCorto(e.materia)}</strong><small>{e.etiqueta}</small></span>
-                    <span class="ex-meta">
-                      {e.impacto > 0 && <span class="impacto" title="Materias que destraba">Destraba {e.impacto}</span>}
-                      <span class="dias" data-dias>{dias >= 0 ? `en ${dias} d` : 'pasó'}</span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div class="pendiente">
-              <p class="vacio">Fechas sin cargar todavía.</p>
+          <div class="pendiente">
+            <p class="vacio">{t.id === 'finales' ? 'Todavía no cargaste fechas de final. Ponelas en cada materia, en la Malla.' : 'Fechas sin cargar todavía.'}</p>
+            {t.id !== 'finales' && (
               <label hidden data-fecha-editable>Agregar fecha de mesa
                 <input type="date" data-campo="fecha" />
               </label>
-            </div>
-          )}
+            )}
+          </div>
         </article>
       ))}
     </div>

@@ -2,7 +2,7 @@
 import { MATERIAS, ELECTIVAS } from '../data/plan.js';
 import * as M from '../lib/motor.js';
 import { ETIQUETA } from '../lib/vista.js';
-import { cargarEstado, cargarElectivas, cargarPlan, guardarPlan, cargarRecursar, guardarRecursar, cargarFechas, guardarFechas, CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
+import { cargarEstado, cargarElectivas, cargarPlan, guardarPlan, cargarRecursar, guardarRecursar, cargarFechas, guardarFechas, cargarFinales, CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
 import { $, $$, el, chip, etiquetaN, vacio, textoDias } from './comun.js';
 
 const est = cargarEstado();
@@ -165,6 +165,13 @@ function actualizarExamenes(ul) {
 
 for (const turno of $$('[data-turno]')) {
   const editable = $('[data-fecha-editable]', turno);
+  if (turno.dataset.turno === 'finales') { // fechas por materia de la cuenta (se cargan en la Malla)
+    const filas = M.examenesDeFinales(cargarFinales()).sort((a, b) => a.fecha.localeCompare(b.fecha))
+      .map((e) => filaExamen({ ...e, etiqueta: 'Final' }));
+    $('.vacio', turno).hidden = filas.length > 0;
+    if (filas.length) { const ul = el('ul', { class: 'examenes' }, ...filas); $('.pendiente', turno).append(ul); actualizarExamenes(ul); }
+    continue;
+  }
   if (!editable) { const ul = $('.examenes', turno); if (ul) actualizarExamenes(ul); continue; }
   const id = turno.dataset.turno; const cont = $('.pendiente', turno);
   const input = $('input', editable);

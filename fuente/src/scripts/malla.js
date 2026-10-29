@@ -1,7 +1,7 @@
 // Malla interactiva: resalta correlativas, abre el panel y deja cambiar estado y nota.
 import * as M from '../lib/motor.js';
 import { ETIQUETA, MODALIDAD, NOMBRE_NIVEL } from '../lib/vista.js';
-import { cargarEstado, guardarEstado } from '../lib/progreso.js';
+import { cargarEstado, guardarEstado, cargarFinales, guardarFinales } from '../lib/progreso.js';
 import { $, $$, el, chip, etiquetaN, vacio } from './comun.js';
 
 let est = cargarEstado();
@@ -51,6 +51,7 @@ function pintarPanel() {
   campo('estado').value = e;
   const nota = campo('nota');
   nota.value = est[n]?.nota ?? ''; nota.disabled = !M.admiteNota(e);
+  campo('final').value = cargarFinales()[n] ?? '';
   const v = M.veredicto(est, n);
   const ver = campo('veredicto'); ver.textContent = v.texto; ver.dataset.tono = v.tono;
 
@@ -104,6 +105,11 @@ for (const caja of cajas) caja.addEventListener('click', () => abrir(Number(caja
 $('[data-accion="cerrar-panel"]', panel).addEventListener('click', cerrar);
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && sel) cerrar(); });
 campo('estado').addEventListener('change', (ev) => guardarCambio(sel, ev.target.value, est[sel]?.nota));
+campo('final').addEventListener('change', (ev) => {
+  const f = cargarFinales();
+  if (ev.target.value) f[sel] = ev.target.value; else delete f[sel];
+  guardarFinales(f);
+});
 campo('nota').addEventListener('change', (ev) => {
   const t = ev.target.value.trim();
   const v = t === '' ? null : Number(t);

@@ -54,6 +54,9 @@ const porNivel = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel
         <label>Nota
           <input type="number" min="1" max="10" step="1" inputmode="numeric" data-campo="nota" placeholder="—" />
         </label>
+        <label>Fecha de final
+          <input type="date" data-campo="final" />
+        </label>
       </div>
       <p class="veredicto" data-campo="veredicto" aria-live="polite"></p>
       <div class="listas">

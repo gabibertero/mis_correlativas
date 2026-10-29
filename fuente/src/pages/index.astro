@@ -128,7 +128,7 @@ const pasos = [
             <p class="cuenta-m"><strong>{nombreCorto(prox.materia)}</strong></p>
             <p class="suave"><time datetime={prox.fecha}>{fmt.format(prox.d).replace(/^./, (c) => c.toUpperCase())}</time><span class="sep" aria-hidden="true">·</span>{prox.etiqueta}</p>
           </div>
-        ) : <p class="vacio">No hay mesas cargadas. Sumalas desde el Planificador.</p>}
+        ) : <p class="vacio">No hay mesas cargadas. Poné la fecha del final en cada materia, en la Malla.</p>}
         <ol class="proximos" data-proximos-finales>
           {proximos.map((e) => <li data-materia={e.materia} data-fecha={e.fecha} data-tipo={e.tipo} data-opcional={e.opcional ? 'si' : null}><time datetime={e.fecha}>{fmt.format(new Date(`${e.fecha}T00:00:00`)).replace(/^./, (c) => c.toUpperCase())}</time><strong>{nombreCorto(e.materia)}</strong><small>{e.etiqueta}</small></li>)}
         </ol>

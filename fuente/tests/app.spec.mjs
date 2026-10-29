@@ -274,8 +274,8 @@ test.describe('planificador', () => {
     await page.locator('[data-turno="feb-mar-2027"] [data-fecha-editable] input').fill('');
     await expect(page.locator('[data-turno="feb-mar-2027"] [data-turno-cuenta]')).toHaveCount(0);
   });
-  test('dashboard usa fecha del planificador? (proxima mesa sigue siendo EXAMENES)', async ({ page }) => {
-    await page.goto(''); await guardarLS(page, 'fechas', {}); await page.reload();
+  test('dashboard muestra la próxima mesa desde las fechas de final de la cuenta', async ({ page }) => {
+    await page.goto(''); await guardarLS(page, 'finales', { 1: '2099-12-11' }); await page.reload();
     await expect(page.locator('[data-countdown]')).toBeVisible();
   });
 });
