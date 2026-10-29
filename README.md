@@ -12,11 +12,11 @@
 [![Abrir el sitio](https://img.shields.io/badge/▶_ABRIR_EL_SITIO-0e6f3f?style=for-the-badge)](https://gabibertero.github.io/mis_correlativas/)
 
 ![Materias](https://img.shields.io/badge/materias-36_+_19_electivas-33d17a?style=flat-square)
-![Tests unitarios](https://img.shields.io/badge/node--test-69_✓-31945d?style=flat-square)
+![Tests unitarios](https://img.shields.io/badge/node--test-78_✓-31945d?style=flat-square)
 ![Tests E2E](https://img.shields.io/badge/Playwright-145_✓-2dbc6d?style=flat-square)
 ![Datos](https://img.shields.io/badge/correlativas-verificadas_vs_PDF_oficial-0e6f3f?style=flat-square)
 ![Celular](https://img.shields.io/badge/funciona_en-celular-1d4ed8?style=flat-square)
-![Sin dependencias](https://img.shields.io/badge/runtime-0_dependencias-555?style=flat-square)
+![Cuentas](https://img.shields.io/badge/cuentas-Supabase-3ECF8E?logo=supabase&logoColor=white&style=flat-square)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-555?style=flat-square)
 [![Último commit](https://img.shields.io/github/last-commit/gabibertero/mis_correlativas?style=flat-square)](https://github.com/gabibertero/mis_correlativas/commits)
 
@@ -32,7 +32,7 @@
 </div>
 
 > [!NOTE]
-> Sitio **no oficial** de seguimiento personal. No tiene relación con la UTN ni con Alumnos. Las correlativas salen del plan oficial de Ingeniería en Sistemas de Información (Plan 2023, UTN FRC), pero ante cualquier duda, verificá siempre en el sistema de la facultad.
+> Sitio **no oficial** de seguimiento personal (hay que crear una cuenta para usarlo). No tiene relación con la UTN ni con Alumnos. Las correlativas salen del plan oficial de Ingeniería en Sistemas de Información (Plan 2023, UTN FRC), pero ante cualquier duda, verificá siempre en el sistema de la facultad.
 
 <details>
 <summary><b>📑 Contenido</b></summary>
@@ -56,7 +56,8 @@ Reemplaza una planilla de Google por una app estática, rápida y pensada para e
 |---|---|---|---|
 | 📊 **Dashboard** | Avance total y por nivel en 3 tonos, promedio, créditos y cuenta regresiva. | 🗺️ **Malla visual** | Todas las materias con su estado y las correlatividades resaltadas. |
 | 🧪 **Simulador "¿y si…?"** | Qué se desbloquea si aprobás X, sin tocar tu estado real. | 📅 **Planificador** | Arrastrá materias y electivas a cuatrimestres, con validación. |
-| ⭐ **Electivas** | 19 electivas con créditos, filtros y buscador. | 💾 **Tus datos, tuyos** | Todo en tu navegador, con exportar e importar `.json`. |
+| ⭐ **Electivas** | 19 electivas con créditos, filtros y buscador. | 🔐 **Tu cuenta** | Login con mail, progreso propio sincronizado entre dispositivos. |
+| 🎓 **Fecha de final** | Cargá la fecha por materia: alimenta la próxima mesa y el planificador. | 🎨 **Temas** | 8 colores y modo claro/oscuro, guardados en tu cuenta. |
 
 <details>
 <summary>📊 <b>Dashboard</b>: dónde estás y hacia dónde vas</summary>
@@ -111,6 +112,31 @@ Reemplaza una planilla de Google por una app estática, rápida y pensada para e
 </details>
 
 <details>
+<summary>🔐 <b>Tu cuenta</b>: progreso propio, en todos tus dispositivos</summary>
+
+<br>
+
+- **Registro con mail y contraseña**, sin verificación de mail. La sesión **no expira**.
+- **Login obligatorio**: sin cuenta no se ve ni se toca nada. Pantalla de acceso centrada sobre fondo verde.
+- Cada cuenta tiene su **progreso independiente** (estados, notas, plan, electivas, fechas) y se **sincroniza vía Supabase** entre compu y celular. Si editás en dos dispositivos a la vez, gana el último en guardar (*last-write-wins*).
+- **Mi cuenta**: tu nombre (aparece junto al ícono de persona y en el saludo del Inicio), **8 temas de color**, modo claro/oscuro; todo se guarda en la cuenta.
+- Una cuenta nueva **arranca en blanco**.
+
+</details>
+
+<details>
+<summary>🎓 <b>Fecha de final por materia</b></summary>
+
+<br>
+
+- En el panel de cada materia de la **Malla** hay un campo de fecha de final.
+- Se guarda en tu cuenta y se sincroniza.
+- Alimenta la cuenta regresiva de la **próxima mesa** del Inicio y el turno **Finales con fecha** del Planificador.
+- Cada cuenta arranca sin fechas.
+
+</details>
+
+<details>
 <summary>📱 <b>En el celular</b></summary>
 
 <br>
@@ -128,28 +154,30 @@ Además: tema claro/oscuro, animaciones sutiles (reveal al scroll y transición 
 
 ## 🧭 Cómo usarlo
 
-1. Abrí el **Inicio** y revisá tu avance.
-2. En la **Malla**, tocá cada materia y cargá su estado y nota.
-3. Probá en el **Simulador** qué pasa si aprobás ese final que te queda.
-4. Armá el próximo año en el **Planificador**.
-5. Sumá tus electivas en **Electivas**.
-6. Exportá tu estado de vez en cuando.
+1. **Creá tu cuenta** (mail y contraseña) y elegí nombre y tema en **Mi cuenta**.
+2. En la **Malla**, tocá cada materia y cargá su estado, nota y fecha de final.
+3. Revisá tu avance y la próxima mesa en el **Inicio**.
+4. Probá en el **Simulador** qué pasa si aprobás ese final que te queda.
+5. Armá el próximo año en el **Planificador**.
+6. Sumá tus electivas en **Electivas**.
+7. Exportá tu estado de vez en cuando como respaldo.
 
 > [!TIP]
-> Para pasar tu progreso de la compu al celular: **Exportar estado** en un dispositivo e **Importar estado** en el otro.
+> Para ver tu progreso en el celular, iniciá sesión con la misma cuenta: se sincroniza solo. **Exportar/Importar estado** (`.json`) queda como respaldo.
 
 > [!IMPORTANT]
-> Tu progreso vive **solo en tu navegador** (`localStorage`, prefijo `corr:v1:`). Si borrás los datos del sitio, se pierde: hacé una exportación.
+> El progreso se guarda en tu cuenta (Supabase) y también en el navegador (`localStorage`, prefijo `corr:v1:`). No uses una contraseña que ya uses en otro lado y no te olvides de la tuya: no hay verificación de mail.
 
 ## 🛠️ Cómo está hecho
 
 ![Astro](https://img.shields.io/badge/Astro-BC52EE?logo=astro&logoColor=white&style=flat-square)
 ![JavaScript](https://img.shields.io/badge/JS_vanilla-F7DF1E?logo=javascript&logoColor=black&style=flat-square)
 ![CSS](https://img.shields.io/badge/CSS_con_tokens-1572B6?logo=css&logoColor=white&style=flat-square)
+![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white&style=flat-square)
 ![Node test](https://img.shields.io/badge/node--test-5FA04E?logo=nodedotjs&logoColor=white&style=flat-square)
 ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?logo=playwright&logoColor=white&style=flat-square)
 
-Astro genera HTML estático hacia `docs/` (GitHub Pages). El motor de correlatividades es JS puro y testeado, separado de la UI.
+Astro genera HTML estático hacia `docs/` (GitHub Pages). El motor de correlatividades es JS puro y testeado, separado de la UI. Las cuentas y la sincronización usan Supabase (Auth + base con RLS: cada usuario solo ve sus datos; la anon key del cliente es pública por diseño).
 
 ```mermaid
 flowchart LR
@@ -158,6 +186,7 @@ flowchart LR
   C --> D[Tests: node --test]
   C --> E[Páginas Astro + scripts]
   S[(localStorage corr:v1:)] <--> E
+  E <-->|login + sync last-write-wins| U[(Supabase: Auth + RLS)]
   E --> F[Tests E2E: Playwright]
   E --> G[docs/ en GitHub Pages]
 ```
@@ -170,8 +199,8 @@ github/
 ├── fuente/                 Proyecto Astro
 │   ├── src/
 │   │   ├── data/plan.js    Materias, correlativas, electivas, mesas
-│   │   ├── lib/            motor.js (reglas), progreso.js (localStorage), vista.js
-│   │   ├── scripts/        UI de cada página
+│   │   ├── lib/            motor.js (reglas), progreso.js (localStorage), sync.js + supabase.js (cuentas), vista.js
+│   │   ├── scripts/        UI de cada página (auth.js: login y Mi cuenta)
 │   │   ├── components/ layouts/ pages/ styles/
 │   └── tests/              node --test + Playwright
 ├── docs/                   Build publicado (no editar a mano)
@@ -184,7 +213,7 @@ github/
 
 ## 💻 Para desarrollar
 
-**Requisitos:** Node 20 o superior.
+**Requisitos:** Node 20 o superior. El cliente de Supabase ya está configurado (URL y anon key públicas; la seguridad la da RLS).
 
 ```bash
 cd fuente
@@ -214,6 +243,9 @@ npx playwright test --config tests/playwright.config.mjs   # E2E
 - [x] Electivas en el planificador y tabla filtrable
 - [x] Exportar e importar estado
 - [x] Tema claro/oscuro y mobile-first
+- [x] Cuentas con Supabase: login obligatorio y sincronización entre dispositivos
+- [x] Mi cuenta: nombre y 8 temas de color
+- [x] Fecha de final por materia
 - [x] Activar GitHub Pages
 - [ ] Cargar fechas de mesas de febrero/marzo y julio 2027
 - [x] GIFs de demo en este README
@@ -229,7 +261,13 @@ No. Es un proyecto personal de seguimiento, sin vínculo con la UTN.
 <details>
 <summary>¿Se guarda mi progreso?</summary>
 
-Sí, en tu navegador (`localStorage`). No hay cuentas ni servidor. Exportá un `.json` como respaldo.
+Sí. Con tu cuenta se guarda en Supabase y se sincroniza entre dispositivos (también queda copia en el navegador). Exportá un `.json` si querés un respaldo propio.
+</details>
+
+<details>
+<summary>¿Necesito cuenta? ¿Me pide verificar el mail?</summary>
+
+Sí, el login es obligatorio. El registro es con mail y contraseña, sin verificación de mail, y la sesión no expira. Cada cuenta nueva empieza en blanco.
 </details>
 
 <details>
@@ -243,10 +281,10 @@ Abrí un [issue](https://github.com/gabibertero/mis_correlativas/issues/new/choo
 Todo el sitio se hizo con [Claude Code](https://claude.com/claude-code):
 
 - **Diseño:** identidad verde esmeralda, tokens claro/oscuro, malla, Home y animaciones.
-- **Código:** páginas Astro, scripts de UI y persistencia.
+- **Código:** páginas Astro, scripts de UI, persistencia, cuentas con Supabase (login, sincronización, Mi cuenta) y fecha de final por materia.
 - **Motor de correlatividades:** reglas de cursar, rendir final y destrabar, con cierre transitivo.
 - **Datos:** correlativas verificadas contra el PDF oficial del plan.
-- **Tests:** 69 unitarios y 145 E2E.
+- **Tests:** 78 unitarios y 145 E2E.
 - **Agentes:** `web`, `disenador`, `estetica`, `tester` y `readme`, orquestados por Gabi.
 
 Los commits llevan `Co-Authored-By: Claude`, por eso Claude figura en Contributors. Revisión y criterio final: Gabi.
