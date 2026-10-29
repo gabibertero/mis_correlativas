@@ -124,6 +124,8 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
 </html>
 
 <style is:global>
+  /* Gate de login: con JS, el contenido está oculto hasta que auth.js confirma la sesión (data-sesion="si"). Sin JS se ve todo. */
+  .js body:not([data-sesion="si"]) main { display: none; }
   .sesion { flex: none; max-width: 11rem; }
   .sesion svg { width: 20px; height: 20px; flex: none; }
   .sesion span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

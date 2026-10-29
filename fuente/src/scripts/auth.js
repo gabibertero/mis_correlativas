@@ -46,7 +46,11 @@ function iniciar() {
     vistaForm.hidden = !!sesion;
     vistaCuenta.hidden = !sesion;
     dlg.querySelector('[data-mail]').textContent = email ?? '';
-    if (!sesion) { titulo.textContent = registro ? 'Crear cuenta' : 'Entrar'; } else titulo.textContent = 'Tu cuenta';
+    titulo.textContent = sesion ? 'Tu cuenta' : registro ? 'Crear cuenta' : 'Entrar';
+    // Gate: sin sesión el contenido queda oculto (CSS en Layout según body[data-sesion]) y el modal no se puede cerrar.
+    document.body.dataset.sesion = sesion ? 'si' : 'no';
+    dlg.querySelector('[data-cerrar]').hidden = !sesion;
+    if (!sesion && !dlg.open) { aviso.textContent = ''; dlg.showModal(); }
   };
   const sincronizar = async () => {
     if (!sesion) return;
@@ -62,7 +66,9 @@ function iniciar() {
   pintarModo();
   btn.addEventListener('click', () => { aviso.textContent = ''; dlg.showModal(); (sesion ? dlg.querySelector('[data-salir]') : mail).focus(); });
   dlg.querySelector('[data-cerrar]').addEventListener('click', () => dlg.close());
-  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // click en el fondo
+  dlg.addEventListener('cancel', (e) => { if (!sesion) e.preventDefault(); }); // Esc no cierra el gate
+  dlg.addEventListener('click', (e) => { if (e.target === dlg && sesion) dlg.close(); }); // click en el fondo
+  dlg.addEventListener('close', () => { if (!sesion) setTimeout(() => { if (!sesion && !dlg.open) dlg.showModal(); }); }); // gate: si algo lo cierra sin sesión, reaparece
   alternar.addEventListener('click', () => { registro = !registro; aviso.textContent = ''; pintarModo(); });
 
   form.addEventListener('submit', async (e) => {
