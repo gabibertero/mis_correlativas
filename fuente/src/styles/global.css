@@ -110,13 +110,13 @@ p { margin: 0; }
 
 @media (max-width: 900px) {
   body { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
-  .sitio { position: static; backdrop-filter: none; } /* con backdrop-filter la nav fija quedaría atada al header */
+  .sitio { position: relative; z-index: 30; backdrop-filter: none; } /* z-index: view-transition-name crea un contexto de apilado y las tarjetas con animación tapaban la nav fija */ /* con backdrop-filter la nav fija quedaría atada al header */
   .sitio-in { min-height: 56px; }
   .tema { margin-left: auto; }
   .sitio nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; flex: none; background: color-mix(in srgb, var(--sup) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--borde); padding-bottom: env(safe-area-inset-bottom); }
   .sitio nav ul { justify-content: space-between; gap: 0; padding: 0 var(--s-1); }
   .sitio nav li { flex: 1; min-width: 0; }
-  .sitio nav a { flex-direction: column; justify-content: center; gap: var(--s-1); min-height: var(--nav-h); padding: 0 var(--s-1); border-radius: var(--r-s); font-size: .75rem; overflow-wrap: normal; text-align: center; }
+  .sitio nav a { flex-direction: column; justify-content: center; gap: var(--s-1); min-height: var(--nav-h); padding: 0 var(--s-1); border-radius: var(--r-s); font-size: .6875rem; letter-spacing: -.01em; white-space: nowrap; overflow-wrap: normal; text-align: center; }
   .sitio nav a[aria-current] { background: transparent; }
   .sitio nav a[aria-current] svg { background: var(--acento-suave); box-sizing: content-box; padding: 3px 14px; border-radius: 999px; }
   main { padding-top: var(--s-6); }

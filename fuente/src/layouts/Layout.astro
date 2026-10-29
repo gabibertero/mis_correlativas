@@ -40,6 +40,8 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
     <script is:inline>
       document.documentElement.classList.add('js');
+      // Siempre cargar arriba: evita que el navegador (o el reload del login) restaure el scroll al fondo.
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
       // Tema guardado antes del primer pintado (evita el flash). localStorage puede estar bloqueado.
       try { var t = localStorage.getItem('corr:v1:tema'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; var c = JSON.parse(localStorage.getItem('corr:v1:temaColor')); if (typeof c === 'string' && /^[a-z]+$/.test(c)) document.documentElement.dataset.temaColor = c; } catch (e) {}
     </script>
