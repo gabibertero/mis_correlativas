@@ -2,7 +2,7 @@
 import * as M from '../lib/motor.js';
 import { ETIQUETA, MODALIDAD, NOMBRE_NIVEL } from '../lib/vista.js';
 import { cargarEstado, guardarEstado } from '../lib/progreso.js';
-import { $, $$, el, etiquetaN, vacio } from './comun.js';
+import { $, $$, el, chip, etiquetaN, vacio } from './comun.js';
 
 let est = cargarEstado();
 let sel = null; // n seleccionada
@@ -35,7 +35,9 @@ function pintarRelaciones() {
   }
 }
 
-const item = (n, ok, prefijo) => el('li', {}, `${ok ? '✓' : '✗'} ${prefijo}${M.nombreCorto(n)}`, el('span', { class: 'sr-only' }, ok ? ' (cumplido)' : ' (falta)'));
+// Fila con el estado actual de la materia como chip (mismo componente y colores que las tarjetas; el texto lo hace entendible sin color).
+const fila = (n, ...nodos) => { const li = el('li', {}, ...nodos, chip(M.estadoDe(est, n))); li.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px'; return li; };
+const item = (n, ok, prefijo) => fila(n, `${ok ? '✓' : '✗'} ${prefijo}${M.nombreCorto(n)}`, el('span', { class: 'sr-only' }, ok ? ' (cumplido)' : ' (falta)'));
 const llenar = (ul, nodos, textoVacio) => ul.replaceChildren(...(nodos.length ? nodos : [vacio(textoVacio)]));
 
 function pintarPanel() {
@@ -66,7 +68,7 @@ function pintarPanel() {
   ], e === 'aprobada' ? 'Ya la aprobaste.' : 'Nada: ya cumplís todo.');
 
   const d = [...M.destraba(n)].sort((a, b) => a - b);
-  llenar(lista('destraba'), d.map((x) => el('li', {}, `${etiquetaN(x)} · ${M.nombreCorto(x)}`)), 'No destraba otras materias.');
+  llenar(lista('destraba'), d.map((x) => fila(x, `${etiquetaN(x)} · ${M.nombreCorto(x)}`)), 'No destraba otras materias.');
   panel.hidden = false;
 }
 
