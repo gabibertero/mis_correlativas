@@ -1,5 +1,5 @@
 // Login con Supabase: botón en el header + <dialog> (ambos viven en Layout). Sincroniza vía lib/sync.js.
-import { limpiarLocal } from '../lib/progreso.js';
+import { limpiarLocal, cargarNombre, guardarNombre, cargarTemaColor, guardarTemaColor, cargarTemaModo } from '../lib/progreso.js';
 import { supabase } from '../lib/supabase.js';
 import { pull, habilitarPush } from '../lib/sync.js';
 
@@ -32,6 +32,28 @@ function iniciar() {
   const clave = form.elements.password;
   let registro = false;
   let sesion = null;
+  const raiz = document.documentElement;
+  const nombreIn = dlg.querySelector('[data-perfil-nombre]');
+  const radios = [...dlg.querySelectorAll('[data-tema-opcion]')];
+
+  // Aplica el perfil guardado (nombre, color, modo) a header, panel, saludo del Home y <html>.
+  const pintarPerfil = () => {
+    const nombre = cargarNombre();
+    const color = cargarTemaColor();
+    const modo = cargarTemaModo();
+    raiz.dataset.temaColor = color;
+    radios.forEach((r) => { r.checked = r.value === color; });
+    nombreIn.value = nombre;
+    btn.querySelector('[data-texto]').textContent = nombre || sesion?.user?.email || 'Entrar';
+    const saludo = $('[data-saludo]');
+    if (saludo) { saludo.hidden = !nombre; saludo.textContent = nombre ? `Hola, ${nombre}` : ''; }
+    if (modo) { // mismo mecanismo que el script de tema del Layout: data-theme + clave corr:v1:tema
+      const t = modo === 'oscuro' ? 'dark' : 'light';
+      raiz.dataset.theme = t;
+      try { localStorage.setItem('corr:v1:tema', t); } catch { /* bloqueado */ }
+      dispatchEvent(new Event('tema-cambio')); // el botón del Layout repinta aria-pressed
+    }
+  };
 
   const pintarModo = () => {
     titulo.textContent = registro ? 'Crear cuenta' : 'Entrar';
@@ -42,11 +64,12 @@ function iniciar() {
   const pintarSesion = () => {
     const email = sesion?.user?.email;
     btn.querySelector('[data-texto]').textContent = email ?? 'Entrar';
+    if (sesion) pintarPerfil();
     btn.setAttribute('aria-label', email ? `Cuenta: ${email}` : 'Entrar o crear cuenta');
     vistaForm.hidden = !!sesion;
     vistaCuenta.hidden = !sesion;
     dlg.querySelector('[data-mail]').textContent = email ?? '';
-    titulo.textContent = sesion ? 'Tu cuenta' : registro ? 'Crear cuenta' : 'Entrar';
+    titulo.textContent = sesion ? 'Mi cuenta' : registro ? 'Crear cuenta' : 'Entrar';
     // Gate: sin sesión el contenido queda oculto (CSS en Layout según body[data-sesion]) y el modal no se puede cerrar.
     document.body.dataset.sesion = sesion ? 'si' : 'no';
     dlg.querySelector('[data-cerrar]').hidden = !sesion;
@@ -69,6 +92,15 @@ function iniciar() {
   dlg.addEventListener('cancel', (e) => { if (!sesion) e.preventDefault(); }); // Esc no cierra el gate
   dlg.addEventListener('click', (e) => { if (e.target === dlg && sesion) dlg.close(); }); // click en el fondo
   dlg.addEventListener('close', () => { if (!sesion) setTimeout(() => { if (!sesion && !dlg.open) dlg.showModal(); }); }); // gate: si algo lo cierra sin sesión, reaparece
+  // Preview en vivo del color; solo se persiste con Guardar. Al cerrar el panel sin guardar se revierte al color guardado.
+  radios.forEach((r) => r.addEventListener('change', () => { raiz.dataset.temaColor = r.value; }));
+  dlg.addEventListener('close', () => { if (sesion) pintarPerfil(); });
+  dlg.querySelector('[data-perfil-guardar]').addEventListener('click', () => {
+    guardarNombre(nombreIn.value);
+    guardarTemaColor(radios.find((r) => r.checked)?.value ?? cargarTemaColor());
+    pintarPerfil(); // header (nombre en vez del mail) y saludo del Home; sin reload para no cortar el push de 1 s
+    dlg.close();
+  });
   alternar.addEventListener('click', () => { registro = !registro; aviso.textContent = ''; pintarModo(); });
 
   form.addEventListener('submit', async (e) => {

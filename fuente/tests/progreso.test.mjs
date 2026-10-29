@@ -89,7 +89,7 @@ test('importar rechaza archivos inválidos con mensaje', () => {
 test('importar acepta estado vacío y sanea partes opcionales rotas', () => {
   const v = P.validarImport('{"app":"correlativas","version":1,"estado":{},"plan":"roto","fechas":[1],"electivas":7}');
   assert.ok(v.ok);
-  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, electivas: {} });
+  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, electivas: {}, nombre: '', temaColor: 'verde', temaModo: null });
 });
 
 test('limpiarPlan acepta electivas (e:<slug>) y descarta ids inventados', async () => {
@@ -134,4 +134,25 @@ test('limpiarLocal borra el progreso (prefijo) pero deja el tema y claves ajenas
   P.limpiarLocal();
   assert.deepEqual(Object.keys(d).sort(), ['corr:v1:tema', 'otra']);
   assert.deepEqual(P.cargarFechas(), {});
+});
+
+test('perfil: sanitizadores de nombre, color (whitelist) y modo', () => {
+  assert.equal(P.limpiarNombre('  Gabi  '), 'Gabi');
+  assert.equal(P.limpiarNombre('x'.repeat(100)).length, 40);
+  for (const m of [null, 5, {}, ['a']]) assert.equal(P.limpiarNombre(m), '');
+  for (const c of P.TEMAS_COLOR) assert.equal(P.limpiarTemaColor(c), c);
+  for (const c of ['rojo', '', null, 7, '__proto__', 'VERDE']) assert.equal(P.limpiarTemaColor(c), 'verde');
+  assert.equal(P.limpiarTemaModo('claro'), 'claro');
+  assert.equal(P.limpiarTemaModo('oscuro'), 'oscuro');
+  for (const m of ['dark', '', null, 1, undefined]) assert.equal(P.limpiarTemaModo(m), null);
+});
+
+test('perfil: viaja en export/import y se sanea', () => {
+  P.guardarNombre('Gabi'); P.guardarTemaColor('rosa'); P.guardarTemaModo('oscuro');
+  const v = P.validarImport(JSON.stringify(P.armarExport()));
+  assert.equal(v.datos.nombre, 'Gabi'); assert.equal(v.datos.temaColor, 'rosa'); assert.equal(v.datos.temaModo, 'oscuro');
+  const sucio = P.validarImport('{"app":"correlativas","version":1,"estado":{},"nombre":42,"temaColor":"x","temaModo":"y"}');
+  assert.deepEqual([sucio.datos.nombre, sucio.datos.temaColor, sucio.datos.temaModo], ['', 'verde', null]);
+  P.usarAlmacen(falso()); P.aplicarImport(v.datos);
+  assert.deepEqual([P.cargarNombre(), P.cargarTemaColor(), P.cargarTemaModo()], ['Gabi', 'rosa', 'oscuro']);
 });

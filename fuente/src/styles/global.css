@@ -212,3 +212,55 @@ input[type="date"]:focus, input[type="date"]:focus-within { outline: 3px solid v
 html:not(.js) [data-solo-js] { display: none !important; }
 .sin-js { display: none; }
 html:not(.js) .sin-js { display: block; margin-bottom: var(--s-4); padding: var(--s-3) var(--s-4); border-radius: var(--r-s); background: var(--sup2); border-left: 4px solid var(--acento2); font-size: var(--t-s); font-weight: 600; }
+
+/* Temas de color de acento (los elige el panel "Tu cuenta"; verde = default, sin atributo).
+   Sobrescriben solo los tokens de acento, en claro y oscuro con light-dark(). El selector también
+   aplica a las muestras del picker (.tema-op[data-tema-color]) para tomar el color de la misma fuente. */
+:root[data-tema-color="oceano"], .tema-op[data-tema-color="oceano"] {
+  --marca: #22b8d6;
+  --acento: light-dark(#0e7490, #22d3ee); --relleno: light-dark(#0e7490, #22b8d6);
+  --acento-suave: light-dark(#d4f1f7, #0b3b47); --sobre-acento: light-dark(#ffffff, #04202a);
+  --link: light-dark(#0e7490, #67e8f9);
+}
+:root[data-tema-color="violeta"], .tema-op[data-tema-color="violeta"] {
+  --marca: #a855f7;
+  --acento: light-dark(#7e22ce, #c084fc); --relleno: light-dark(#7e22ce, #a855f7);
+  --acento-suave: light-dark(#eddcfb, #33185a); --sobre-acento: light-dark(#ffffff, #1e0a38);
+  --link: light-dark(#7e22ce, #d8b4fe);
+}
+:root[data-tema-color="indigo"], .tema-op[data-tema-color="indigo"] {
+  --marca: #6366f1;
+  --acento: light-dark(#4338ca, #818cf8); --relleno: light-dark(#4338ca, #6366f1);
+  --acento-suave: light-dark(#e0e3fc, #1b2150); --sobre-acento: light-dark(#ffffff, #0d1033);
+  --link: light-dark(#4338ca, #a5b4fc);
+}
+:root[data-tema-color="rosa"], .tema-op[data-tema-color="rosa"] {
+  --marca: #ec4899;
+  --acento: light-dark(#be185d, #f472b6); --relleno: light-dark(#be185d, #ec4899);
+  --acento-suave: light-dark(#fce1ee, #4d1232); --sobre-acento: light-dark(#ffffff, #3d0620);
+  --link: light-dark(#be185d, #f9a8d4);
+}
+:root[data-tema-color="coral"], .tema-op[data-tema-color="coral"] {
+  --marca: #f2705c;
+  --acento: light-dark(#c0392b, #ff8a75); --relleno: light-dark(#c0392b, #f2705c);
+  --acento-suave: light-dark(#fde3de, #4a1d17); --sobre-acento: light-dark(#ffffff, #3a0c05);
+  --link: light-dark(#b0301f, #ffa391);
+}
+:root[data-tema-color="ambar"], .tema-op[data-tema-color="ambar"] {
+  --marca: #f5a524;
+  --acento: light-dark(#9a5b00, #fbbf24); --relleno: light-dark(#9a5b00, #f5a524);
+  --acento-suave: light-dark(#fdf0cc, #40300a); --sobre-acento: light-dark(#ffffff, #2b1b00);
+  --link: light-dark(#8a5200, #fcd34d);
+}
+:root[data-tema-color="grafito"], .tema-op[data-tema-color="grafito"] {
+  --marca: #64748b;
+  --acento: light-dark(#334155, #cbd5e1); --relleno: light-dark(#334155, #64748b);
+  --acento-suave: light-dark(#e2e8f0, #2a3446); --sobre-acento: light-dark(#ffffff, #0f172a);
+  --link: light-dark(#334155, #e2e8f0);
+}
+:root[data-tema-color="verde"], .tema-op[data-tema-color="verde"] {
+  --marca: #33d17a;
+  --acento: light-dark(#0e6f3f, #3ddc84); --relleno: light-dark(#0e6f3f, #33d17a);
+  --acento-suave: light-dark(#dcf3e5, #15402a); --sobre-acento: light-dark(#ffffff, #05200f);
+  --link: light-dark(#0e6f3f, #4fe394);
+}

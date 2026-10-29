@@ -87,6 +87,12 @@ export function limpiarElectivas(obj) {
   return out;
 }
 
+/** Perfil (viaja con la cuenta): nombre (máx 40), color de la whitelist, modo claro/oscuro (null = seguir al sistema). */
+export const TEMAS_COLOR = ['verde', 'oceano', 'violeta', 'indigo', 'rosa', 'coral', 'ambar', 'grafito'];
+export const limpiarNombre = (x) => (typeof x === 'string' ? x.trim().slice(0, 40).trim() : '');
+export const limpiarTemaColor = (x) => (TEMAS_COLOR.includes(x) ? x : 'verde');
+export const limpiarTemaModo = (x) => (x === 'claro' || x === 'oscuro' ? x : null);
+
 // ---------- Carga / guardado ----------
 const semilla = () => limpiarEstado(JSON.parse(JSON.stringify(ESTADO_INICIAL)));
 export function cargarEstado() {
@@ -103,10 +109,16 @@ export const cargarFechas = () => limpiarFechas(leer('fechas'));
 export const guardarFechas = (f) => guardar('fechas', f);
 export const cargarElectivas = () => limpiarElectivas(leer('electivas'));
 export const guardarElectivas = (e) => guardar('electivas', e);
+export const cargarNombre = () => limpiarNombre(leer('nombre'));
+export const guardarNombre = (n) => guardar('nombre', limpiarNombre(n));
+export const cargarTemaColor = () => limpiarTemaColor(leer('temaColor'));
+export const guardarTemaColor = (c) => guardar('temaColor', limpiarTemaColor(c));
+export const cargarTemaModo = () => limpiarTemaModo(leer('temaModo'));
+export const guardarTemaModo = (m) => guardar('temaModo', limpiarTemaModo(m));
 
 // ---------- Exportar / importar ----------
 export function armarExport() {
-  return { app: 'correlativas', version: 1, exportado: new Date().toISOString(), estado: cargarEstado(), plan: cargarPlan() ?? {}, recursar: cargarRecursar(), fechas: cargarFechas(), electivas: cargarElectivas() };
+  return { app: 'correlativas', version: 1, exportado: new Date().toISOString(), estado: cargarEstado(), plan: cargarPlan() ?? {}, recursar: cargarRecursar(), fechas: cargarFechas(), electivas: cargarElectivas(), nombre: cargarNombre(), temaColor: cargarTemaColor(), temaModo: cargarTemaModo() };
 }
 /** Valida el texto de un archivo. -> { ok:true, datos } | { ok:false, error } */
 export function validarImport(texto) {
@@ -117,8 +129,9 @@ export function validarImport(texto) {
   if (!esObj(j.estado)) return { ok: false, error: 'Al respaldo le falta el estado de las materias.' };
   const estado = limpiarEstado(j.estado);
   if (Object.keys(j.estado).length && !Object.keys(estado).length) return { ok: false, error: 'Ninguna materia del archivo es válida.' };
-  return { ok: true, datos: { estado, plan: limpiarPlan(j.plan), recursar: limpiarRecursar(j.recursar), fechas: limpiarFechas(j.fechas), electivas: limpiarElectivas(j.electivas) } };
+  return { ok: true, datos: { estado, plan: limpiarPlan(j.plan), recursar: limpiarRecursar(j.recursar), fechas: limpiarFechas(j.fechas), electivas: limpiarElectivas(j.electivas), nombre: limpiarNombre(j.nombre), temaColor: limpiarTemaColor(j.temaColor), temaModo: limpiarTemaModo(j.temaModo) } };
 }
-export function aplicarImport({ estado, plan, recursar = [], fechas, electivas }) {
+export function aplicarImport({ estado, plan, recursar = [], fechas, electivas, nombre = '', temaColor = 'verde', temaModo = null }) {
   guardarEstado(estado); guardarPlan(plan); guardarRecursar(recursar); guardarFechas(fechas); guardarElectivas(electivas);
+  guardarNombre(nombre); guardarTemaColor(temaColor); guardarTemaModo(temaModo);
 }
