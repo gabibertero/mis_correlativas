@@ -23,9 +23,24 @@ export function leer(clave) {
   try { const v = almacen()?.getItem(PREFIJO + clave); if (v != null) return JSON.parse(v); } catch { /* roto o bloqueado */ }
   return memoria.has(clave) ? memoria.get(clave) : null;
 }
+let alCambiar = null; // hook para la sincronización en la nube (sync.js)
+export const onCambio = (fn) => { alCambiar = fn; };
 export function guardar(clave, valor) {
   memoria.set(clave, valor);
-  try { almacen()?.setItem(PREFIJO + clave, JSON.stringify(valor)); return true; } catch { return false; }
+  try { almacen()?.setItem(PREFIJO + clave, JSON.stringify(valor)); } catch { return false; }
+  try { alCambiar?.(); } catch { /* la nube no debe romper el guardado local */ }
+  return true;
+}
+
+/** Borra el progreso local (claves con PREFIJO, menos el tema). Al cerrar sesión, para no filtrar datos a la próxima cuenta. */
+export function limpiarLocal() {
+  memoria.clear();
+  try {
+    const a = almacen();
+    const claves = [];
+    for (let i = 0; i < (a?.length ?? 0); i++) claves.push(a.key(i));
+    for (const k of claves) if (k.startsWith(PREFIJO) && k !== `${PREFIJO}tema`) a.removeItem(k);
+  } catch { /* bloqueado: nada que limpiar */ }
 }
 
 const esObj = (x) => x && typeof x === 'object' && !Array.isArray(x);

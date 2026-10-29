@@ -126,3 +126,12 @@ test('estado: promoción lleva nota, pendiente/libre/abandono no; "recursando" e
   const out = P.limpiarEstado({ 1: { estado: 'promocion', nota: 8 }, 2: { estado: 'libre', nota: 5 }, 3: { estado: 'abandono' }, 4: { estado: 'recursando', nota: 7 }, 5: { estado: 'xx' } });
   assert.deepEqual(out, { 1: { estado: 'promocion', nota: 8 }, 2: { estado: 'libre' }, 3: { estado: 'abandono' }, 4: { estado: 'recursando' } });
 });
+
+test('limpiarLocal borra el progreso (prefijo) pero deja el tema y claves ajenas', () => {
+  const d = { 'corr:v1:tema': '"dark"', otra: '1' };
+  P.usarAlmacen({ getItem: (k) => d[k] ?? null, setItem: (k, v) => { d[k] = String(v); }, removeItem: (k) => { delete d[k]; }, key: (i) => Object.keys(d)[i], get length() { return Object.keys(d).length; } });
+  P.guardarFechas({ 'jul-2027': '2027-07-10' }); P.guardar('uid', 'x');
+  P.limpiarLocal();
+  assert.deepEqual(Object.keys(d).sort(), ['corr:v1:tema', 'otra']);
+  assert.deepEqual(P.cargarFechas(), {});
+});

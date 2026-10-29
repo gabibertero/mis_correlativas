@@ -65,8 +65,30 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
             <path data-ico="luna" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>
           </svg>
         </button>
+        <button type="button" class="sesion" data-accion="sesion" aria-haspopup="dialog" aria-label="Entrar o crear cuenta" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span data-texto>Entrar</span>
+        </button>
       </div>
     </header>
+    <dialog class="dlg-sesion" data-sesion-dialogo aria-labelledby="dlg-titulo">
+      <h2 id="dlg-titulo" data-titulo>Entrar</h2>
+      <div data-vista="form">
+        <p class="suave">Con tu cuenta el progreso se guarda en la nube y lo ves en cualquier dispositivo.</p>
+        <form>
+          <label>Mail<input type="email" name="email" autocomplete="email" required /></label>
+          <label>Contraseña<input type="password" name="password" minlength="6" autocomplete="current-password" required /></label>
+          <button type="submit" class="btn-primario" data-enviar>Entrar</button>
+          <button type="button" data-alternar>Crear una cuenta</button>
+        </form>
+      </div>
+      <div data-vista="cuenta" hidden>
+        <p>Sesión iniciada como <strong data-mail></strong>.</p>
+        <button type="button" data-salir>Salir</button>
+      </div>
+      <p role="status" class="dlg-aviso"></p>
+      <button type="button" class="dlg-x" data-cerrar aria-label="Cerrar">×</button>
+    </dialog>
     <main id="contenido"><slot /></main>
     <footer class="pie">
       <div class="pie-in">
@@ -78,6 +100,7 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
     <script>
       import '../scripts/ui.js';
       import '../scripts/reveal.js';
+      import '../scripts/auth.js';
     </script>
     <script>
       // Tema: claro / oscuro. Sin elección guardada se sigue al sistema.
@@ -99,3 +122,17 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
     </script>
   </body>
 </html>
+
+<style is:global>
+  .sesion { flex: none; max-width: 11rem; }
+  .sesion svg { width: 20px; height: 20px; flex: none; }
+  .sesion span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 900px) { .sesion { width: 44px; padding: 0; border-radius: 50%; } .sesion span { display: none; } }
+  .dlg-sesion { position: fixed; inset: 0; margin: auto; width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; background: var(--sup); color: var(--texto); border: 1px solid var(--borde); border-radius: var(--r); padding: var(--s-6); box-shadow: var(--sombra-h); }
+  .dlg-sesion::backdrop { background: rgb(0 0 0 / .5); }
+  .dlg-sesion form { display: grid; gap: var(--s-3); }
+  .dlg-sesion label { display: grid; gap: var(--s-1); font-weight: 600; font-size: var(--t-s); }
+  .dlg-sesion input { font: inherit; min-height: 44px; padding: 0 var(--s-3); border: 1px solid var(--borde-fuerte); border-radius: var(--r-s); background: var(--sup2); color: var(--texto); min-width: 0; }
+  .dlg-aviso { color: var(--error); font-size: var(--t-s); margin: var(--s-3) 0 0; min-height: 1.4em; }
+  .dlg-x { position: absolute; top: var(--s-2); right: var(--s-2); width: 44px; padding: 0; border-radius: 50%; font-size: 1.5rem; border-color: transparent; background: transparent; }
+</style>
