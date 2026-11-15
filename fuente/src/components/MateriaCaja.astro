@@ -1,11 +1,10 @@
 ---
 import { ETIQUETA, MODALIDAD, estadoDe, puedeCursar } from '../lib/vista.js';
-import { ESTADO_INICIAL } from '../data/plan.js';
 import { sinCursar } from '../lib/motor.js';
-const { m } = Astro.props;
-const estado = estadoDe(m.n);
-const nota = ESTADO_INICIAL[m.n]?.nota;
-const habilitada = sinCursar(estado) && puedeCursar(m);
+const { m, est = {} } = Astro.props;
+const estado = estadoDe(m.n, est);
+const nota = est[m.n]?.nota;
+const habilitada = sinCursar(estado) && puedeCursar(m, est);
 ---
 <button type="button" class="mat" disabled data-materia={m.n} data-nivel={m.nivel} data-estado={estado} data-hs={m.hs} data-opcional={m.opcional ? 'si' : 'no'}
   data-reg={m.reg.join(',')} data-aprob={m.aprob.join(',')} data-habilitada={habilitada ? 'si' : 'no'}

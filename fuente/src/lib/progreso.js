@@ -19,6 +19,14 @@ let alm; // undefined = usar globalThis.localStorage; los tests inyectan uno
 export const usarAlmacen = (a) => { alm = a; memoria.clear(); };
 const almacen = () => { try { return alm !== undefined ? alm : globalThis.localStorage ?? null; } catch { return null; } };
 
+// Otra pestaña puede reemplazar o borrar el progreso. El respaldo en memoria no
+// debe resucitar valores anteriores cuando la clave ya no existe en localStorage.
+globalThis.addEventListener?.('storage', (ev) => {
+  if (ev.storageArea !== almacen()) return;
+  if (ev.key === null) memoria.clear();
+  else if (ev.key.startsWith(PREFIJO)) memoria.delete(ev.key.slice(PREFIJO.length));
+});
+
 export function leer(clave) {
   try { const v = almacen()?.getItem(PREFIJO + clave); if (v != null) return JSON.parse(v); } catch { /* roto o bloqueado */ }
   return memoria.has(clave) ? memoria.get(clave) : null;

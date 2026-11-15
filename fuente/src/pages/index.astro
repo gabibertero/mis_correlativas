@@ -1,24 +1,24 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { MATERIAS, MATERIAS_PLAN, NIVELES, ESTADO_INICIAL, EXAMENES, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { MATERIAS_PLAN, NIVELES, EXAMENES, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
 import { resumen, sinCursar, resumenPorNivel, proximosFinales, planProximoAnio, esElectiva } from '../lib/motor.js';
 import { NOMBRE_NIVEL, estadoDe, puedeCursar, puedeRendir, destraba, nombreCorto } from '../lib/vista.js';
 
 const base = import.meta.env.BASE_URL;
-const r = resumen(ESTADO_INICIAL);
+// El HTML compartido arranca vacío; el navegador aplica el progreso de cada cuenta.
+const estadoVacio = {};
+const r = resumen(estadoVacio);
 const total = r.total; // 36: el Seminario (opcional) no cuenta
-const aprobadas = MATERIAS_PLAN.filter((m) => estadoDe(m.n) === 'aprobada');
 const pct = r.pct;
-const notas = aprobadas.map((m) => ESTADO_INICIAL[m.n]?.nota).filter((x) => x != null);
-const promedio = notas.length ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(2).replace('.', ',') : '—';
+const promedio = r.promedio == null ? '—' : r.promedio.toFixed(2).replace('.', ',');
 const cursables = MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(m.n)) && puedeCursar(m));
 const rendibles = MATERIAS_PLAN.filter((m) => puedeRendir(m));
 const masDestraban = MATERIAS_PLAN.filter((m) => estadoDe(m.n) !== 'aprobada').map((m) => ({ m, d: destraba(m.n).size })).sort((a, b) => b.d - a.d).slice(0, 4);
 
-const niveles = resumenPorNivel(ESTADO_INICIAL);
+const niveles = resumenPorNivel(estadoVacio);
 const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-const proximos = proximosFinales(EXAMENES, ESTADO_INICIAL);
-const plan2027 = planProximoAnio(ESTADO_INICIAL);
+const proximos = proximosFinales(EXAMENES, estadoVacio);
+const plan2027 = planProximoAnio(estadoVacio);
 const NOMBRE_CUATRI = { '2027-1C': '1º cuatrimestre 2027', '2027-2C': '2º cuatrimestre 2027' };
 const prox = EXAMENES.map((e) => ({ ...e, d: new Date(`${e.fecha}T00:00:00`) })).filter((e) => e.d >= hoy).sort((a, b) => a.d - b.d)[0];
 const dias = prox ? Math.round((prox.d - hoy) / 86400000) : null;
@@ -34,12 +34,12 @@ for (const nv of NIVELES) {
 }
 const aristas = MATERIAS_PLAN.flatMap((m) => [...m.reg, ...m.aprob].filter((p) => pos[p] && pos[m.n]).map((p) => ({ a: pos[p], b: pos[m.n] })));
 const kpis = [
-  { id: 'aprobadas', valor: `${aprobadas.length}`, obj: aprobadas.length, de: `/${total}`, label: 'Materias aprobadas' },
-  { id: 'promedio', valor: promedio, de: '', label: `Promedio · ${notas.length} notas` },
-  { id: 'finales', valor: `${rendibles.length}`, obj: rendibles.length, de: '', label: 'Finales por rendir', urgencia: r.urgencia },
+  { id: 'aprobadas', valor: `${r.aprobadas}`, obj: r.aprobadas, de: `/${total}`, label: 'Materias aprobadas' },
+  { id: 'promedio', valor: promedio, de: '', label: `Promedio · ${r.notas} ${r.notas === 1 ? 'nota' : 'notas'}` },
+  { id: 'finales', valor: `${r.finales}`, obj: r.finales, de: '', label: 'Finales habilitados', urgencia: r.urgencia },
 ];
 const pasos = [
-  { id: 'avance', valor: pct, etiqueta: 'Hoy', sub: 'Lo que ya aprobaste', n: aprobadas.length },
+  { id: 'avance', valor: pct, etiqueta: 'Hoy', sub: 'Lo que ya aprobaste', n: r.aprobadas },
   { id: 'proy-cursando', valor: r.proyCursando.pct, etiqueta: 'Si apruebo lo que curso', sub: 'Aprobadas más las que cursás', n: r.proyCursando.n },
   { id: 'proy-finales', valor: r.proyFinales.pct, etiqueta: 'Si apruebo lo que curso y los finales', sub: 'Más los finales que podés rendir', n: r.proyFinales.n },
 ];
@@ -58,7 +58,7 @@ const pasos = [
       <p class="eyebrow" data-saludo hidden></p>
       <p class="eyebrow">Ingeniería en Sistemas<span class="sep" aria-hidden="true">·</span>Plan 2023<span class="sep" aria-hidden="true">·</span>UTN FRC</p>
       <h1 id="titulo-hero">Tu carrera, <span class="resalte">materia por materia</span>.</h1>
-      <p class="lead">Llevás <strong class="num" data-kpi-texto="aprobadas">{aprobadas.length}</strong> de {total} aprobadas. Mirá qué podés cursar y rendir ahora, y qué te destraba cada final.</p>
+      <p class="lead">Llevás <strong class="num" data-kpi-texto="aprobadas">{r.aprobadas}</strong> de {total} aprobadas. Mirá qué podés cursar y rendir ahora, y qué te destraba cada final.</p>
       <div class="acciones">
         <a class="btn btn-primario" href={`${base}malla/`}>Ver la malla</a>
         <a class="btn" href="#ahora">Qué puedo hacer ahora</a>
@@ -73,7 +73,7 @@ const pasos = [
         </svg>
         <p class="anillo-n"><span class="num" data-anillo-valor>{pct}</span><small>%</small></p>
       </div>
-      <p class="anillo-t"><strong>Avance de la carrera</strong><span>{aprobadas.length} de {total} materias</span></p>
+      <p class="anillo-t"><strong>Avance de la carrera</strong><span data-anillo-resumen>{r.aprobadas} de {total} materias</span></p>
     </div>
   </section>
 
@@ -84,6 +84,7 @@ const pasos = [
         <li class="kpi paso" data-kpi={k.id} data-n={k.n} data-total={total} data-paso={i} style={`--i:${i + 1}`}>
           <p class="paso-e">{k.etiqueta}</p>
           <p class="paso-v"><span class="num" data-valor data-objetivo={k.valor}>{k.valor}</span><span class="de">%</span></p>
+          <p class="paso-n" data-paso-cantidad>{k.n} de {total} materias</p>
         </li>
       ))}
     </ol>
@@ -94,7 +95,7 @@ const pasos = [
   <section class="kpis" aria-label="Resumen">
     {kpis.map((k, i) => (
       <div class="kpi card" data-kpi={k.id} data-nivel-urgencia={k.urgencia} style={`--i:${i + 2}`}>
-        {k.id === 'finales' && <p class="sem-etq" aria-hidden="true"><span data-sem="ok">Al día</span><span data-sem="medio">A rendir</span><span data-sem="alto">Muchos pendientes</span></p>}
+        {k.id === 'finales' && <p class="sem-etq" aria-hidden="true"><span data-sem="ok">Ninguno habilitado</span><span data-sem="medio">Para rendir</span><span data-sem="alto">Varios habilitados</span></p>}
         <p class="kpi-v"><span class="num" data-valor data-objetivo={k.obj}>{k.valor}</span><span class="de">{k.de}</span></p>
         <p class="kpi-l">{k.label}</p>
       </div>
@@ -250,13 +251,13 @@ const pasos = [
   .paso { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'e v' 'n v'; align-items: center; }
   .paso-e { grid-area: e; }
   .paso-v { grid-area: v; }
-  .paso::after { grid-area: n; }
+  .paso-n { grid-area: n; }
   .paso-e { font-size: var(--t-s); font-weight: 600; color: var(--suave); line-height: 1.3; }
   .paso-v { font-family: var(--f-disp); font-weight: 800; font-size: 2.5rem; line-height: 1; letter-spacing: -.03em; display: flex; align-items: baseline; }
   .paso-v .de { font-size: var(--t-xl); color: var(--suave); margin-left: var(--s-1); }
   .paso[data-paso='0'] .paso-v .num { color: var(--acento); }
   .paso[data-paso='1'] .paso-v .num, .paso[data-paso='2'] .paso-v .num { color: var(--acento2); }
-  .paso::after { content: attr(data-n) ' de ' attr(data-total) ' materias'; font-size: var(--t-xs); color: var(--suave); font-variant-numeric: tabular-nums; }
+  .paso-n { font-size: var(--t-xs); color: var(--suave); font-variant-numeric: tabular-nums; }
   @media (min-width: 761px) {
     .pasos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-6); }
     .paso { padding: var(--s-4) var(--s-4) var(--s-4) var(--s-6); border-left-width: 1px; border-top: 6px solid var(--c); }
@@ -283,7 +284,7 @@ const pasos = [
   .kpi-l { font-size: var(--t-s); color: var(--suave); }
   .kpi[data-kpi='aprobadas'] .kpi-v .num { color: var(--e-aprobada); }
   .kpi[data-kpi='promedio'] .kpi-v .num { color: var(--acento2); }
-  /* Semáforo de finales por rendir: ok = verde fuerte, medio = amarillo, alto = naranja */
+  /* Semáforo de finales habilitados: ok = verde fuerte, medio = amarillo, alto = naranja */
   .sem-etq { font-size: var(--t-xs); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
   .sem-etq span { display: none; align-items: center; gap: 6px; }
   .sem-etq span::before { content: ''; width: 14px; height: 14px; background: currentColor; mask: var(--i-tilde) center / contain no-repeat; -webkit-mask: var(--i-tilde) center / contain no-repeat; }

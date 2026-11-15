@@ -1,7 +1,7 @@
 // Dashboard: KPIs, avance por nivel, créditos, "qué puedo hacer ahora", cuenta regresiva, exportar/importar.
 import { ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
 import * as M from '../lib/motor.js';
-import { cargarEstado, cargarFechas, cargarFinales, cargarElectivas, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
+import { PREFIJO, cargarEstado, cargarFechas, cargarFinales, cargarElectivas, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
 import { $, $$, el, etiquetaN, filaMateria, vacio, fmtFecha } from './comun.js';
 
 const reemplazarLista = (cont, items, textoVacio) => {
@@ -29,8 +29,14 @@ function pintar() {
   $('[data-kpi="finales"]').dataset.nivelUrgencia = r.urgencia; // ok | medio | alto (0 / 1-2 / 3+)
   kpi('proy-cursando', r.proyCursando.pct);
   kpi('proy-finales', r.proyFinales.pct);
-  for (const [id, p] of [['proy-cursando', r.proyCursando], ['proy-finales', r.proyFinales]]) $(`[data-kpi="${id}"]`).dataset.n = p.n;
+  for (const [id, n] of [['avance', r.aprobadas], ['proy-cursando', r.proyCursando.n], ['proy-finales', r.proyFinales.n]]) {
+    const paso = $(`[data-kpi="${id}"]`);
+    paso.dataset.n = n;
+    paso.dataset.total = r.total;
+    $('[data-paso-cantidad]', paso).textContent = `${n} de ${r.total} materias`;
+  }
   $('[data-kpi-texto="aprobadas"]').textContent = r.aprobadas;
+  $('[data-anillo-resumen]').textContent = `${r.aprobadas} de ${r.total} materias`;
   const anillo = $('[data-anillo]');
   anillo.setAttribute('aria-label', `Avance de la carrera: ${r.pct} por ciento`);
   $('[data-anillo-valor]').textContent = r.pct;
@@ -86,6 +92,10 @@ function pintar() {
     el('p', { class: 'suave' }, el('time', { datetime: p.fecha }, fmtFecha(M.parseFecha(p.fecha))), p.materia ? ` · ${p.etiqueta}` : '')));
 }
 pintar();
+// Al volver atrás el navegador puede restaurar el DOM anterior sin ejecutar de nuevo el script.
+addEventListener('pageshow', (ev) => { if (ev.persisted) pintar(); });
+const clavesResumen = new Set(['estado', 'electivas', 'finales', 'fechas'].map((c) => PREFIJO + c));
+addEventListener('storage', (ev) => { if (ev.key === null || clavesResumen.has(ev.key)) pintar(); });
 
 // Exportar / importar
 const bExp = $('[data-accion="exportar"]'); const bImp = $('[data-accion="importar"]'); const archivo = $('[data-importar-archivo]');

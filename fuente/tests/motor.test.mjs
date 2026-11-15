@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MATERIAS, ELECTIVAS, ESTADOS, ESTADO_INICIAL } from '../src/data/plan.js';
+import { MATERIAS, MATERIAS_PLAN, ELECTIVAS, ESTADOS, ESTADO_INICIAL } from '../src/data/plan.js';
 import * as M from '../src/lib/motor.js';
 
 // Fixture: mesas de diciembre 2026 de Gabi (en la app viven en la cuenta como `finales`, ya no en plan.js).
@@ -269,6 +269,55 @@ test('total 36: el Seminario (99) existe pero no entra en ningún conteo', () =>
   }
   assert.equal(M.resumen(todas()).pct, 100);
   assert.equal(M.resumen(todas()).aprobadas, 36);
+});
+
+test('totales del plan: 36 materias únicas repartidas 8/9/6/7/6 por nivel', () => {
+  assert.equal(new Set(MATERIAS_PLAN.map((m) => m.n)).size, 36);
+  assert.deepEqual(MATERIAS_PLAN.map((m) => m.n), Array.from({ length: 36 }, (_, i) => i + 1));
+  assert.deepEqual(M.resumen({}).niveles.map((n) => n.total), [8, 9, 6, 7, 6]);
+  assert.deepEqual(M.resumenPorNivel({}).map((n) => n.total), [8, 9, 6, 7, 6]);
+});
+
+test('conteos extremos: cuenta vacía y cada estado aplicado a todo el plan', () => {
+  const vacia = M.resumen({});
+  assert.deepEqual([vacia.aprobadas, vacia.pct, vacia.proyCursando.n, vacia.proyFinales.n, vacia.finales], [0, 0, 0, 0, 0]);
+  assert.equal(vacia.promedio, null);
+  assert.equal(vacia.notas, 0);
+  for (const estado of ESTADOS) {
+    const est = Object.fromEntries(MATERIAS.map((m) => [m.n, { estado }]));
+    const r = M.resumen(est);
+    const aprobadas = estado === 'aprobada' ? 36 : 0;
+    const cursando = estado === 'cursando' ? 36 : 0;
+    // Con todas regulares/recursando/promocionadas solo las 9 sin correlativas tienen final habilitado.
+    const finales = ['regular', 'recursando', 'promocion'].includes(estado) ? 9 : 0;
+    assert.deepEqual([r.aprobadas, r.proyCursando.n, r.proyFinales.n, r.finales],
+      [aprobadas, aprobadas + cursando, aprobadas + cursando + finales, finales], estado);
+    assert.equal(r.pct, estado === 'aprobada' ? 100 : 0, estado);
+    assert.equal(r.total, 36, estado);
+  }
+});
+
+test('el Seminario nunca altera cantidades, proyecciones ni promedio del plan', () => {
+  const base = { 1: { estado: 'aprobada', nota: 8 }, 2: { estado: 'cursando' }, 3: { estado: 'regular' } };
+  const esperado = M.resumen(base);
+  for (const estado of ESTADOS) {
+    const est = { ...base, 99: { estado, nota: 10 } };
+    assert.deepEqual(M.resumen(est), esperado, estado);
+    assert.deepEqual(M.resumenPorNivel(est), M.resumenPorNivel(base), estado);
+  }
+});
+
+test('electivas e ids ajenos no se mezclan con el conteo de materias obligatorias', () => {
+  const base = { 1: { estado: 'aprobada', nota: 8 } };
+  const ajenos = Object.fromEntries(ELECTIVAS.flatMap((e) => [
+    [M.idElectiva(e), { estado: 'aprobada', nota: 10 }],
+    [M.slug(e.nombre), { estado: 'cursando' }],
+  ]));
+  const est = { ...base, ...ajenos, 0: { estado: 'aprobada', nota: 1 }, 100: { estado: 'regular' } };
+  assert.deepEqual(M.resumen(est), M.resumen(base));
+  assert.deepEqual(M.resumenPorNivel(est), M.resumenPorNivel(base));
+  const elect = Object.fromEntries(ELECTIVAS.map((e) => [M.slug(e.nombre), 'aprobada']));
+  assert.deepEqual(M.creditos(elect, ELECTIVAS), { ing: 58, analista: 4 });
 });
 
 test('proyecciones: hoy, "si apruebo lo que curso" y "+ finales" (Gabi: 14 / 19 / 21 de 36)', () => {

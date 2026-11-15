@@ -15,8 +15,9 @@ function pintar() {
     const estado = elect[id] ?? 'pendiente';
     const f = M.faltan(est, e);
     const ok = !f.reg.length && !f.aprob.length;
-    li.dataset.estado = estado; li.dataset.habilitada = ok ? 'si' : 'no';
-    if (ok && estado === 'pendiente') puedo++;
+    const habilitada = ok && estado === 'pendiente';
+    li.dataset.estado = estado; li.dataset.habilitada = habilitada ? 'si' : 'no';
+    if (habilitada) puedo++;
 
     const chipEl = estado !== 'pendiente' ? chip(estado) : ok ? el('span', { class: 'chip chip-hab' }, 'Habilitada') : chip('pendiente', 'Bloqueada');
     $('.el-est', li).replaceChildren(chipEl);
