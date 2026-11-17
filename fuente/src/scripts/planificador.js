@@ -1,6 +1,6 @@
 // Planificador: cursado y finales explícitos, con intensivos optativos de febrero.
-import { MATERIAS } from '../data/plan.js';
-import { CATALOGO_ELECTIVAS } from '../data/trayectos.js';
+import { MATERIAS, CREDITOS_INGENIERIA } from '../data/plan.js';
+import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 import * as M from '../lib/motor.js';
 import { cargarEstado, cargarElectivas, cargarPlan, guardarPlan, cargarRecursar, guardarRecursar, cargarFechas, guardarFechas, cargarFinales, cargarLicenciatura, cargarOpcionesPlan, guardarOpcionesPlan, CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
 import { $, $$, el, chip, etiquetaN, vacio, textoDias } from './comun.js';
@@ -9,6 +9,14 @@ const electEst = cargarElectivas();
 const est = M.conElectivas(cargarEstado(), electEst);
 const licenciatura = cargarLicenciatura();
 const catalogo = CATALOGO_ELECTIVAS.filter((e) => !e.licenciatura || e.licenciatura === licenciatura);
+const licElegida = LICENCIATURAS.find((l) => l.id === licenciatura) ?? null;
+const nombreLic = (id) => (LICENCIATURAS.find((l) => l.id === id)?.nombre ?? 'Licenciatura').replace(/^Licenciatura en /, 'Lic. ');
+/** obligatoria · electiva (habitual) · licenciatura: define color, cajita y créditos. */
+const tipoDe = (n) => (!M.esElectiva(n) ? 'obligatoria' : M.electivaPorId[n].licenciatura ? 'licenciatura' : 'electiva');
+/** Créditos que sumarían las electivas de `ns` si se aprueban: sin las ya aprobadas ni las de otra licenciatura. */
+const creditosPlanificados = (ns) => [...new Set(ns)].filter((n) => M.esElectiva(n)).map((n) => M.electivaPorId[n])
+  .filter((e) => (!e.licenciatura || e.licenciatura === licenciatura) && electEst[M.slug(e.nombre)] !== 'aprobada')
+  .reduce((a, e) => a + e.creditos, 0);
 const opciones = cargarOpcionesPlan();
 opciones.veranoExtrasPorAnio ??= {};
 let veranoAnio = CUATRIS.find(M.esVerano)?.slice(0, 4) ?? '2027';
@@ -43,17 +51,19 @@ function textoRequisitos(n) {
 }
 
 function filaMateriaPlan(n, i) {
-  const elec = M.esElectiva(n); const m = itemDe(n);
+  const elec = M.esElectiva(n); const m = itemDe(n); const tipo = tipoDe(n);
   const rec = recursar.has(n);
   const activos = periodosActivos(); const pos = activos.indexOf(ids[i]);
   const resultado = opciones.resultados[n] ?? opciones.resultado;
   const resultadoSelect = el('select', { dataset: { resultadoPlan: '', materia: n }, 'aria-label': `Resultado previsto de ${M.nombreCorto(n)}` },
     el('option', { value: 'regular' }, 'Solo regularizar'), el('option', { value: 'aprobada' }, 'Aprobar final / directa'));
   resultadoSelect.value = resultado;
-  return el('li', { draggable: 'true', dataset: { materia: n, hs: M.hsDe(n), recursar: rec ? 'si' : 'no', ...(elec && { electiva: 'si' }) } },
-    el('span', { class: 'n num' }, elec ? 'E' : etiquetaN(n)),
+  return el('li', { draggable: 'true', dataset: { materia: n, hs: M.hsDe(n), recursar: rec ? 'si' : 'no', tipo, ...(elec && { electiva: 'si' }) } },
+    el('span', { class: 'n num', ...(elec && { 'aria-hidden': 'true' }) }, tipo === 'electiva' ? 'E' : tipo === 'licenciatura' ? 'L' : etiquetaN(n)),
     el('span', { class: 's-nom' }, M.nombreCorto(n),
-      elec ? el('small', {}, el('span', { class: 'chip-electiva' }, `Electiva · ${m.creditos} cr`)) : el('small', {}, `${m.hs} hs semanales de referencia`),
+      elec ? el('small', { class: 'insignias-plan' },
+        el('span', { class: 'insignia-tipo' }, tipo === 'licenciatura' ? nombreLic(m.licenciatura) : 'Electiva'),
+        el('span', { class: 'insignia-cr' }, `+${m.creditos} créditos`)) : el('small', {}, `${m.hs} hs semanales de referencia`),
       el('small', { class: 'modalidad', dataset: { modalidad: M.esVerano(ids[i]) ? 'Intensivo en febrero' : M.modalidadInfo(m).label } }, M.esVerano(ids[i]) ? 'Intensivo en febrero · oferta a confirmar' : M.modalidadInfo(m).label || 'Dictado a confirmar'),
       !M.esVerano(ids[i]) && M.esContracuatri(n, ids[i]) ? el('small', { class: 'contra-cuatri', dataset: { contracuatri: 'si' } }, 'Contracuatrimestre: menos cátedras') : null,
       el('small', { class: 'requisitos-plan' }, textoRequisitos(n)),
@@ -107,6 +117,10 @@ function pintarCuatris() {
     $('progress', art).hidden = verano;
     $('progress', art).value = hs;
     art.dataset.sobrecarga = hs > limite ? 'si' : 'no';
+    const crPeriodo = creditosPlanificados(ns);
+    const crP = $('[data-creditos-periodo]', art);
+    crP.hidden = !crPeriodo;
+    crP.textContent = crPeriodo ? `+${crPeriodo} créditos electivos en este período, si aprobás sus electivas.` : '';
     const avisos = M.avisosCuatri(est, plan, ids, i, limite, recursar, opciones);
     if (verano && !opciones.incluirVerano && ns.length) avisos.unshift('Tenés un intensivo guardado; activá verano para incluirlo en nuevas propuestas o quitá sus materias.');
     if (ns.some((n) => itemDe(n).licenciatura && itemDe(n).licenciatura !== licenciatura)) avisos.push('Este período conserva materias de una licenciatura que no está elegida; no suman créditos al trayecto actual.');
@@ -115,13 +129,39 @@ function pintarCuatris() {
     const ofrecida = (n) => !verano || oferta.has(n);
     const materias = MATERIAS.filter((m) => !usadas.has(m.n) && ofrecida(m.n) && (M.sinCursar(M.estadoDe(est, m.n)) || M.estadoDe(est, m.n) === 'cursando'));
     const electivas = catalogo.filter((e) => !usadas.has(M.idElectiva(e)) && ofrecida(M.idElectiva(e)) && (M.sinCursar(M.estadoDe(est, M.idElectiva(e))) || M.estadoDe(est, M.idElectiva(e)) === 'cursando') && (!e.desde || Number(id.slice(0, 4)) >= e.desde));
+    const habituales = electivas.filter((e) => !e.licenciatura);
+    const deLic = electivas.filter((e) => e.licenciatura);
+    const opcionElectiva = (e) => el('option', { value: M.idElectiva(e) }, `${e.nombre} (+${e.creditos} cr)`);
+    const grupoLic = verano ? null
+      : !licElegida ? el('optgroup', { label: 'Licenciatura' }, el('option', { value: '', disabled: true }, 'Elegí tu licenciatura en la página Licenciaturas'))
+      : el('optgroup', { label: `${licElegida.nombre} · suman créditos` }, ...(deLic.length ? deLic.map(opcionElectiva) : [el('option', { value: '', disabled: true }, licElegida.materias.length ? 'Ya están todas en tu plan o no se dictan este año' : 'Sin materias publicadas todavía')]));
     const recursables = [...MATERIAS.map((m) => m.n), ...catalogo.map(M.idElectiva)].filter((n) => !usadas.has(n) && ofrecida(n) && ['regular', 'recursando', 'promocion'].includes(M.estadoDe(est, n)));
     $('[data-campo="materia"]', art).replaceChildren(el('option', { value: '' }, 'Elegí una materia…'),
       el('optgroup', { label: verano ? 'Intensivos posibles de febrero' : 'Materias del plan' }, ...materias.map((m) => el('option', { value: m.n }, `${etiquetaN(m.n)} · ${m.nombre}${m.opcional ? ' (opcional)' : ''}`))),
-      el('optgroup', { label: 'Electivas de tu selección' }, ...electivas.map((e) => el('option', { value: M.idElectiva(e) }, `${e.nombre} (${e.creditos} cr)`))),
+      habituales.length ? el('optgroup', { label: 'Electivas · suman créditos' }, ...habituales.map(opcionElectiva)) : null,
+      grupoLic,
       el('optgroup', { label: 'Volver a cursar (opcional)' }, ...recursables.map((n) => el('option', { value: n, dataset: { recursar: 'si' } }, M.nombreCorto(n)))));
   });
   $('[data-accion="sumar-cuatri"]').disabled = visibles >= activos.length;
+  pintarCreditos();
+}
+
+function pintarCreditos() {
+  const caja = $('[data-creditos-plan]'); caja.hidden = false;
+  const hoy = M.creditos(electEst, CATALOGO_ELECTIVAS, est, licenciatura).ing;
+  const plan_ = creditosPlanificados(Object.values(plan).flat());
+  const total = hoy + plan_; const meta = CREDITOS_INGENIERIA;
+  const pct = (x) => `${Math.min(100, (x / meta) * 100).toFixed(1)}%`;
+  $('[data-cr-hoy]', caja).textContent = hoy;
+  $('[data-cr-plan]', caja).textContent = plan_;
+  $('[data-cr-total]', caja).textContent = total;
+  $('[data-cr-barra-hoy]', caja).style.width = pct(hoy);
+  $('[data-cr-barra-plan]', caja).style.width = pct(Math.min(plan_, Math.max(0, meta - hoy)));
+  $('[data-cr-texto]', caja).textContent = !plan_
+    ? (hoy >= meta ? `Ya cumplís los ${meta} créditos de Ingeniería.` : 'Sumá electivas o materias de tu licenciatura al plan para proyectar cuántos créditos te faltan.')
+    : total >= meta ? `Si aprobás las planificadas, llegás a ${total} de ${meta}: cumplís los créditos de Ingeniería.`
+      : `Si aprobás las planificadas, llegás a ${total} de ${meta}. Te faltarían ${meta - total}.`;
+  $('[data-cr-lic]', caja).hidden = !!licElegida;
 }
 
 function cambiarPlan(id, ns) {

@@ -5,6 +5,7 @@ import { CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
 import { ETIQUETA, estadoDe } from '../lib/vista.js';
 import { nombrePeriodo, esVerano } from '../lib/motor.js';
 
+const base = import.meta.env.BASE_URL;
 const HS_LIMITE = 30; // shortcut: umbral de sobrecarga provisorio, lo define Gabi/`web`.
 const enCurso = MATERIAS.filter((m) => estadoDe(m.n) === 'cursando');
 const nombreCuatri = nombrePeriodo;
@@ -27,6 +28,13 @@ const turnos = [
     <div class="herramientas" hidden data-herramientas>
       <button type="button" class="btn-primario" data-accion="proponer-plan">Proponer un plan</button>
       <button type="button" data-accion="sumar-cuatri">Sumar un período</button>
+      <div class="creditos-plan" data-creditos-plan hidden>
+        <p class="cr-titulo"><strong>Créditos electivos</strong> <span class="suave">· Ingeniería pide 20</span></p>
+        <p class="cr-cifras"><span><strong class="num" data-cr-hoy>0</strong> aprobados hoy</span><span aria-hidden="true">+</span><span><strong class="num" data-cr-plan>0</strong> planificados</span><span aria-hidden="true">=</span><span><strong class="num" data-cr-total>0</strong> de 20</span></p>
+        <div class="cr-barra" aria-hidden="true"><span class="cr-hoy" data-cr-barra-hoy></span><span class="cr-plan" data-cr-barra-plan></span></div>
+        <p class="suave" data-cr-texto></p>
+        <p class="suave" data-cr-lic hidden>Todavía no elegiste licenciatura: elegila en <a href={`${base}licenciaturas/`}>Licenciaturas</a> para sumar sus materias al plan.</p>
+      </div>
       <div class="opciones-plan">
         <label class="opcion-check"><input type="checkbox" data-incluir-verano />Incluir intensivos de febrero</label>
         <p class="suave">Son optativos. Análisis I y II, Álgebra y Física I y II aparecen como posibilidades de verano; la oferta y las condiciones de cada año se confirman con la Facultad.</p>
@@ -45,6 +53,12 @@ const turnos = [
       <details class="ayuda"><summary>Cómo se valida el plan</summary><p class="suave">«Regular» pide cursada aprobada; «Aprobada» pide final o aprobación directa. El plan no convierte todas tus regulares en aprobadas. Las anuales de marzo continúan en el segundo cuatrimestre, y los intensivos se completan en febrero. Las materias que no puedan ubicarse quedan indicadas para que ajustes finales, oferta y carga. Las 36 obligatorias no incluyen los créditos electivos ni la PPS. Las electivas de tu licenciatura elegida se agregan desde su catálogo y las condiciones de dictado aún no publicadas se marcan para confirmar. Arrastrá una materia o usá «Anterior» y «Siguiente» para moverla.</p></details>
       <p class="aviso" data-estado-plan role="status" aria-live="polite"></p>
     </div>
+    <ul class="leyenda-plan" aria-label="Referencias de colores del plan">
+      <li><span class="muestra" data-tipo="obligatoria" aria-hidden="true">N</span>Obligatoria</li>
+      <li><span class="muestra" data-tipo="electiva" aria-hidden="true">E</span>Electiva · suma créditos</li>
+      <li><span class="muestra" data-tipo="licenciatura" aria-hidden="true">L</span>Licenciatura · suma créditos</li>
+      <li><mark class="deuda">Resaltado</mark>Correlativa que debés</li>
+    </ul>
     <div class="cuatris">
       {cuatris.map((c) => {
         const hs = c.mats.reduce((a, m) => a + m.hs, 0);
@@ -57,6 +71,7 @@ const turnos = [
             <p class="horas"><span class="num" data-hs-total>{hs}</span> <span class="suave" data-carga-label>de {HS_LIMITE} unidades de carga orientativa</span></p>
             <progress max={HS_LIMITE} value={hs} aria-label={`Carga orientativa de ${c.nombre}`}></progress>
             <p class="suave carga-aclaracion" data-carga-aclaracion>Las horas de obligatorias y los créditos de electivas orientan la carga; no reemplazan el horario de cursado.</p>
+            <p class="creditos-periodo" data-creditos-periodo hidden></p>
             {c.mats.length ? (
               <ul class="slots" data-slot-lista>
                 {c.mats.map((m) => (
@@ -100,6 +115,47 @@ const turnos = [
 </script>
 
 <style is:global>
+  /* Tokens propios del planificador (claro/oscuro). Violeta = electiva habitual · rosa intenso =
+     licenciatura (distinto de --error) · amarillo = solo resaltado de deuda. */
+  :root {
+    --plan-elec: light-dark(#6d28d9, #c4b5fd);
+    --plan-elec-bg: light-dark(#f1eaff, #2b1e4d);
+    --plan-elec-borde: light-dark(#8b5cf6, #9b7cf0);
+    --plan-lic: light-dark(#b0105a, #f9a8d4);
+    --plan-lic-bg: light-dark(#fde6f0, #4a1332);
+    --plan-lic-borde: light-dark(#db2777, #ec5aa0);
+    --plan-deuda-bg: light-dark(#fde047, #fcd34d);
+    --plan-deuda-t: light-dark(#2e2200, #1f1600);
+  }
+  .creditos-plan { flex-basis: 100%; display: grid; gap: var(--s-1); padding: var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); font-size: var(--t-s); }
+  .creditos-plan[hidden] { display: none; }
+  .creditos-plan p { margin: 0; }
+  .creditos-plan .suave { font-size: var(--t-xs); line-height: 1.5; }
+  .cr-cifras { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-2); }
+  .cr-cifras .num { font-size: var(--t-xl); font-weight: 800; }
+  .cr-cifras [data-cr-plan] { color: var(--plan-elec); }
+  .cr-barra { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--sup2); border: 1px solid var(--borde); }
+  .cr-barra .cr-hoy { background: var(--relleno); }
+  .cr-barra .cr-plan { background: repeating-linear-gradient(135deg, var(--plan-elec-borde) 0 6px, color-mix(in srgb, var(--plan-elec-borde) 55%, transparent) 6px 12px); }
+  .creditos-periodo { margin: 0; font-size: var(--t-xs); font-weight: 700; color: var(--plan-elec); }
+  .creditos-periodo[hidden] { display: none; }
+  /* Leyenda de colores */
+  .leyenda-plan { list-style: none; margin: 0 0 var(--s-3); padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); font-size: var(--t-xs); color: var(--suave); }
+  .leyenda-plan li { display: inline-flex; align-items: center; gap: var(--s-2); }
+  .muestra { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; font-weight: 800; background: var(--acento-suave); color: var(--acento); }
+  .muestra[data-tipo='electiva'], .slots li[data-tipo='electiva'] .n { background: var(--plan-elec-bg); color: var(--plan-elec); box-shadow: inset 0 0 0 1.5px var(--plan-elec-borde); }
+  .muestra[data-tipo='licenciatura'], .slots li[data-tipo='licenciatura'] .n { background: var(--plan-lic-bg); color: var(--plan-lic); box-shadow: inset 0 0 0 1.5px var(--plan-lic-borde); }
+  /* Filas de electiva / licenciatura: acento lateral + insignias de tipo y créditos */
+  .slots li[data-tipo='electiva']:not(.vacio) { border-left: 4px solid var(--plan-elec-borde); }
+  .slots li[data-tipo='licenciatura']:not(.vacio) { border-left: 4px solid var(--plan-lic-borde); }
+  .s-nom > small.insignias-plan { display: flex; flex-wrap: wrap; gap: var(--s-1); flex: 1 0 100%; margin: 2px 0; }
+  .insignia-tipo, .insignia-cr { display: inline-flex; align-items: center; padding: 1px var(--s-2); border-radius: 999px; font-weight: 700; line-height: 1.4; }
+  li[data-tipo='electiva'] .insignia-tipo { background: var(--plan-elec-bg); color: var(--plan-elec); }
+  li[data-tipo='electiva'] .insignia-cr { color: var(--plan-elec); border: 1px solid var(--plan-elec-borde); }
+  li[data-tipo='licenciatura'] .insignia-tipo { background: var(--plan-lic-bg); color: var(--plan-lic); }
+  li[data-tipo='licenciatura'] .insignia-cr { color: var(--plan-lic); border: 1px solid var(--plan-lic-borde); }
+  /* Resaltador de deuda */
+  mark.deuda { background: var(--plan-deuda-bg); color: var(--plan-deuda-t); padding: 0 3px; border-radius: 3px; font-weight: 700; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .opciones-plan { flex-basis: 100%; display: grid; gap: var(--s-3); padding-top: var(--s-2); }
   .opciones-plan p, .carga-aclaracion { font-size: var(--t-xs); line-height: 1.5; }
   .opcion-check, .finales-previstos label { display: flex; align-items: flex-start; gap: var(--s-2); min-height: 44px; font-size: var(--t-s); }
@@ -182,8 +238,6 @@ const turnos = [
   .toggle-recursar[aria-pressed='true'] { border-style: solid; border-color: var(--acento2); background: var(--acento2-suave); color: var(--acento2); font-weight: 700; }
   .marca-recursar { display: inline-flex !important; flex: 0 0 auto; align-items: center; gap: var(--s-1); margin-top: var(--s-1); padding: 0 var(--s-2); border-radius: 999px; background: var(--acento2-suave); color: var(--acento2) !important; font-weight: 700 !important; }
   .marca-recursar::before { width: 12px; height: 12px; }
-  .chip-electiva { display: inline-block; margin-right: var(--s-1); padding: 0 var(--s-2); border-radius: 999px; border: 1px solid color-mix(in srgb, var(--acento2) 45%, transparent); background: var(--acento2-suave); color: var(--acento2); font-weight: 700; }
-  .slots li[data-electiva='si'] .n { background: var(--acento2-suave); color: var(--acento2); }
   /* ✕ centrada: máscara SVG en vez de glifo (los glifos tienen sesgo vertical) */
   .quitar { width: 44px; padding: 0; font-size: 0; border-color: transparent; background: transparent; color: var(--suave); }
   .quitar::before { content: ''; width: 16px; height: 16px; background: currentColor; mask: var(--i-x) center / contain no-repeat; -webkit-mask: var(--i-x) center / contain no-repeat; }

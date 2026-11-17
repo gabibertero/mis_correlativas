@@ -120,7 +120,8 @@ test.describe('planificador: electivas', () => {
     await c.locator('select').selectOption(BACKEND);
     await c.locator('[data-accion="agregar-materia"]').click();
     const fila = c.locator(`li[data-materia="${BACKEND}"]`);
-    await expect(fila).toContainText('Electiva · 4 cr');
+    await expect(fila).toContainText('+4 créditos');
+    await expect(fila).toHaveAttribute('data-tipo', 'electiva');
     await expect(c.locator('[data-hs-total]')).toHaveText(String(antes + 4));
     await expect(c.locator('[data-avisos]')).toContainText('Backend de Aplicaciones: falta');
     expect((await leerPlan(page))['2026-2C']).toContain(BACKEND);
