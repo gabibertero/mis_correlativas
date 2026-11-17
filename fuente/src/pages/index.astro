@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { MATERIAS_PLAN, NIVELES, EXAMENES, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
-import { resumen, sinCursar, resumenPorNivel, proximosFinales, planProximoAnio, esElectiva } from '../lib/motor.js';
+import { MATERIAS_PLAN, NIVELES, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { resumen, sinCursar, resumenPorNivel, planProximoAnio, ordenarPorNivel, porN } from '../lib/motor.js';
 import { NOMBRE_NIVEL, estadoDe, puedeCursar, puedeRendir, destraba, nombreCorto } from '../lib/vista.js';
 
 const base = import.meta.env.BASE_URL;
@@ -12,17 +12,12 @@ const total = r.total; // 36: el Seminario (opcional) no cuenta
 const pct = r.pct;
 const promedio = r.promedio == null ? '—' : r.promedio.toFixed(2).replace('.', ',');
 const cursables = MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(m.n)) && puedeCursar(m));
-const rendibles = MATERIAS_PLAN.filter((m) => puedeRendir(m));
+const rendibles = ordenarPorNivel(MATERIAS_PLAN.filter((m) => puedeRendir(m)).map((m) => m.n)).map((n) => porN[n]);
 const masDestraban = MATERIAS_PLAN.filter((m) => estadoDe(m.n) !== 'aprobada').map((m) => ({ m, d: destraba(m.n).size })).sort((a, b) => b.d - a.d).slice(0, 4);
 
 const niveles = resumenPorNivel(estadoVacio);
-const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-const proximos = proximosFinales(EXAMENES, estadoVacio);
 const plan2027 = planProximoAnio(estadoVacio);
 const NOMBRE_CUATRI = { '2027-1C': '1º cuatrimestre 2027', '2027-2C': '2º cuatrimestre 2027' };
-const prox = EXAMENES.map((e) => ({ ...e, d: new Date(`${e.fecha}T00:00:00`) })).filter((e) => e.d >= hoy).sort((a, b) => a.d - b.d)[0];
-const dias = prox ? Math.round((prox.d - hoy) / 86400000) : null;
-const fmt = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const R = 52, C = 2 * Math.PI * R;
 // Mini-malla del hero: un nodo por materia del plan (columna = nivel) y una arista por correlativa real.
@@ -98,6 +93,7 @@ const pasos = [
         {k.id === 'finales' && <p class="sem-etq" aria-hidden="true"><span data-sem="ok">Ninguno habilitado</span><span data-sem="medio">Para rendir</span><span data-sem="alto">Varios habilitados</span></p>}
         <p class="kpi-v"><span class="num" data-valor data-objetivo={k.obj}>{k.valor}</span><span class="de">{k.de}</span></p>
         <p class="kpi-l">{k.label}</p>
+        {k.id === 'finales' && <ul class="kpi-finales" data-finales-nombres aria-label="Finales habilitados, por nivel" hidden></ul>}
       </div>
     ))}
   </section>
@@ -121,18 +117,10 @@ const pasos = [
     </section>
 
     <div class="col">
-      <section class="seccion card cuenta" aria-labelledby="h-mesa" data-vista="cuenta-regresiva" id="cuenta-regresiva">
-        <header><h2 id="h-mesa">Próximos finales</h2></header>
-        {prox ? (
-          <div data-countdown data-fecha={prox.fecha} data-materia={prox.materia}>
-            <p class="cuenta-n"><span class="num" data-dias>{dias}</span><span>{dias === 1 ? 'día' : 'días'}</span></p>
-            <p class="cuenta-m"><strong>{nombreCorto(prox.materia)}</strong></p>
-            <p class="suave"><time datetime={prox.fecha}>{fmt.format(prox.d).replace(/^./, (c) => c.toUpperCase())}</time><span class="sep" aria-hidden="true">·</span>{prox.etiqueta}</p>
-          </div>
-        ) : <p class="vacio">No hay mesas cargadas. Poné la fecha del final en cada materia, en la Malla.</p>}
-        <ol class="proximos" data-proximos-finales>
-          {proximos.map((e) => <li data-materia={e.materia} data-fecha={e.fecha} data-tipo={e.tipo} data-opcional={e.opcional ? 'si' : null}><time datetime={e.fecha}>{fmt.format(new Date(`${e.fecha}T00:00:00`)).replace(/^./, (c) => c.toUpperCase())}</time><strong>{nombreCorto(e.materia)}</strong><small>{e.etiqueta}</small></li>)}
-        </ol>
+      <section class="seccion card orden-finales" aria-labelledby="h-orden" data-vista="orden-finales" id="orden-finales">
+        <header><h2 id="h-orden">Orden recomendado de finales</h2><p>Primero los que más materias te destraban</p></header>
+        <ol class="orden" role="list" data-orden-finales hidden></ol>
+        <p class="vacio" data-orden-vacio>No debés finales.</p>
       </section>
       <section class="seccion card" aria-labelledby="h-cred" data-vista="creditos">
         <header><h2 id="h-cred">Créditos electivos</h2><a href={`${base}electivas/`}>Ver electivas</a></header>
@@ -324,18 +312,29 @@ const pasos = [
   .leyenda-barra span { display: inline-flex; align-items: center; gap: 6px; }
   .leyenda-barra i { width: 12px; height: 12px; border-radius: 4px; display: block; }
 
-  .cuenta { background: linear-gradient(160deg, var(--acento2-suave), var(--sup) 85%); border-color: color-mix(in srgb, var(--azul-solido) 35%, var(--borde)); }
-  .cuenta-n { display: flex; align-items: baseline; gap: var(--s-2); font-family: var(--f-disp); font-weight: 800; color: var(--acento2); font-size: var(--t-l); }
-  .cuenta-n .num { font-size: 4rem; line-height: 1; letter-spacing: -.03em; }
-  .cuenta-m { font-size: var(--t-l); margin-top: var(--s-1); }
-  /* Próximos finales: fecha en cajita + materia; los opcionales van punteados */
-  .proximos { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-2); }
-  .proximos li { display: grid; grid-template-areas: 'f' 'm' 'e'; gap: 2px; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: color-mix(in srgb, var(--sup) 72%, transparent); border: 1px solid var(--borde); font-size: var(--t-s); }
-  .proximos time { grid-area: f; font-weight: 700; color: var(--acento2); font-variant-numeric: tabular-nums; }
-  .proximos strong { grid-area: m; font-weight: 700; }
-  .proximos small { grid-area: e; color: var(--suave); font-size: var(--t-xs); }
-  .proximos li[data-opcional='si'] { border-style: dashed; border-color: var(--borde-fuerte); background: transparent; }
-  .proximos li[data-opcional='si'] strong::after { content: 'Opcional'; margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: 999px; font-size: var(--t-xs); font-weight: 600; color: var(--suave); border: 1px solid var(--borde-fuerte); }
+  /* Finales habilitados: nombres cortos agrupados por nivel, debajo del número */
+  .kpi-finales { list-style: none; margin: var(--s-2) 0 0; padding: var(--s-2) 0 0; display: grid; gap: var(--s-1); border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+  .kpi-finales > li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s-1); font-size: var(--t-xs); line-height: 1.2; }
+  .kpi-finales .kf-nv { min-width: 6.2em; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+  .kpi-finales .kf-m { padding: 2px var(--s-2); border-radius: 999px; font-weight: 700; background: color-mix(in srgb, currentColor 12%, transparent); border: 1px solid color-mix(in srgb, currentColor 30%, transparent); white-space: nowrap; }
+
+  /* Orden recomendado de finales: posición grande + materia + cuánto traba + si ya se puede rendir */
+  .orden-finales { background: linear-gradient(160deg, var(--acento2-suave), var(--sup) 85%); border-color: color-mix(in srgb, var(--azul-solido) 35%, var(--borde)); }
+  .orden-finales > header { margin-bottom: var(--s-3); }
+  .orden { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+  .orden > li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--s-3); align-items: start; padding: var(--s-3); border-radius: var(--r-s); background: color-mix(in srgb, var(--sup) 80%, transparent); border: 1px solid var(--borde); }
+  .orden > li[data-rendible='si'] { border-left: 4px solid var(--acento); }
+  .orden > li[data-rendible='no'] { border-left: 4px dashed var(--borde-fuerte); }
+  .of-pos { grid-row: span 3; min-width: 1.7ch; font-family: var(--f-disp); font-weight: 800; font-size: 2.25rem; line-height: 1; letter-spacing: -.03em; color: var(--acento2); font-variant-numeric: tabular-nums; }
+  .of-pos small { font-size: .45em; vertical-align: super; margin-left: 1px; }
+  .orden > li[data-rendible='no'] .of-pos { color: var(--suave); }
+  .of-nombre { font-weight: 700; line-height: 1.25; }
+  .of-traba { font-size: var(--t-s); font-weight: 600; }
+  .of-traba small { font-size: var(--t-xs); font-weight: 600; color: var(--suave); }
+  .of-estado { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); margin-top: 2px; font-size: var(--t-xs); }
+  .of-estado .insignia-hab { padding-block: 2px; }
+  .of-antes { color: var(--suave); font-weight: 600; }
+  .of-fecha { color: var(--acento2); font-weight: 700; font-variant-numeric: tabular-nums; }
   .cred { margin-top: var(--s-4); }
   .cred p { display: flex; justify-content: space-between; align-items: baseline; font-size: var(--t-s); margin-bottom: var(--s-2); }
   .cred p b { font-family: var(--f-disp); font-size: var(--t-l); }
