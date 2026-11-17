@@ -15,6 +15,7 @@ const NS = new Set(MATERIAS.map((m) => m.n));
 const IDS_ELECTIVAS = new Set(CATALOGO_ELECTIVAS.map((e) => slug(e.nombre)));
 const IDS_PLAN = new Set([...NS, ...CATALOGO_ELECTIVAS.map((e) => `e:${slug(e.nombre)}`)]); // materias (Nº) + electivas ('e:<slug>')
 const IDS_LICENCIATURAS = new Set(LICENCIATURAS.map((l) => l.id));
+const ANIOS_VERANO = new Set(CUATRIS.filter((id) => id.endsWith('-VER')).map((id) => id.slice(0, 4)));
 const MAX_BYTES = 200_000;
 
 const memoria = new Map();
@@ -121,8 +122,15 @@ export function limpiarOpcionesPlan(obj) {
   if (esObj(o.veranoExtrasPorAnio)) for (const [anio, lista] of Object.entries(o.veranoExtrasPorAnio)) {
     if (/^20\d{2}$/.test(anio) && CUATRIS.includes(`${anio}-VER`)) veranoExtrasPorAnio[anio] = listaIds(lista, NS);
   }
+  // Febreros activos por año. Migración: el interruptor viejo `incluirVerano` (todos los
+  // febreros) pasa a ser solo el primero, 2027; los demás se suman a mano.
+  const veranos = Array.isArray(o.veranos)
+    ? [...new Set(o.veranos.map(String).filter((anio) => ANIOS_VERANO.has(anio)))].sort()
+    : o.incluirVerano === true ? ['2027'] : [];
   return {
-    incluirVerano: o.incluirVerano === true,
+    // Derivado, solo por compatibilidad con respaldos y versiones anteriores. Manda `veranos`.
+    incluirVerano: veranos.length > 0,
+    veranos,
     // La lista plana es compatibilidad del primer verano (2027). Las nuevas
     // confirmaciones se guardan por año: la oferta excepcional no se repite sola.
     veranoExtras: listaIds(o.veranoExtras, NS),

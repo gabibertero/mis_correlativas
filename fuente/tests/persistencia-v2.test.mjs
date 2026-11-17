@@ -10,7 +10,7 @@ const almacen = () => {
   return { getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => datos.set(k, String(v)) };
 };
 beforeEach(() => P.usarAlmacen(almacen()));
-const opcionesVacias = { incluirVerano: false, veranoExtras: [], veranoExtrasPorAnio: {}, resultado: 'regular', resultados: {}, finalesPrevistos: [] };
+const opcionesVacias = { incluirVerano: false, veranos: [], veranoExtras: [], veranoExtrasPorAnio: {}, resultado: 'regular', resultados: {}, finalesPrevistos: [] };
 
 test('electivas conservan todos los estados académicos sin transformar regular en aprobada', () => {
   const id = slug(CATALOGO_ELECTIVAS[0].nombre);
@@ -55,8 +55,20 @@ test('opciones de planificación validan hipótesis, finales e intensivos adicio
     resultados: { 2: 'aprobada', 'e:green-software': 'regular', 999: 'aprobada', 3: 'libre' },
     finalesPrevistos: [2, 'e:green-software', 2, 999],
   });
-  assert.deepEqual(opt, { incluirVerano: true, veranoExtras: [6], veranoExtrasPorAnio: {}, resultado: 'aprobada', resultados: { 2: 'aprobada', 'e:green-software': 'regular' }, finalesPrevistos: [2, 'e:green-software'] });
+  assert.deepEqual(opt, { incluirVerano: true, veranos: ['2027'], veranoExtras: [6], veranoExtrasPorAnio: {}, resultado: 'aprobada', resultados: { 2: 'aprobada', 'e:green-software': 'regular' }, finalesPrevistos: [2, 'e:green-software'] });
   assert.deepEqual(P.limpiarOpcionesPlan({ incluirVerano: 'si', resultado: 'libre', resultados: [] }), opcionesVacias);
+});
+
+test('febreros activos por año: válidos, sin repetidos, ordenados y con migración del interruptor viejo', () => {
+  assert.deepEqual(P.limpiarOpcionesPlan({ veranos: ['2029', 2027, '2027', '2026', '2034', 'x', null] }).veranos, ['2027', '2029']);
+  assert.equal(P.limpiarOpcionesPlan({ veranos: ['2028'] }).incluirVerano, true);
+  // Sin `veranos`: el interruptor viejo activa solo febrero 2027.
+  assert.deepEqual(P.limpiarOpcionesPlan({ incluirVerano: true }).veranos, ['2027']);
+  assert.deepEqual(P.limpiarOpcionesPlan({ incluirVerano: false }).veranos, []);
+  // Con `veranos` explícito, manda la lista aunque el derivado viejo diga otra cosa.
+  assert.deepEqual(P.limpiarOpcionesPlan({ incluirVerano: true, veranos: [] }), { ...opcionesVacias });
+  const ida = P.limpiarOpcionesPlan({ veranos: ['2030'] });
+  assert.deepEqual(P.limpiarOpcionesPlan(ida), ida); // idempotente
 });
 
 test('la oferta de intensivos excepcional se conserva por año y descarta años e IDs inválidos', () => {
@@ -69,7 +81,7 @@ test('la oferta de intensivos excepcional se conserva por año y descarta años 
 
 test('respaldo versión1 conserva licenciatura, estados ampliados y plan de verano entre dispositivos', () => {
   const seg = slug(CATALOGO_ELECTIVAS.find((e) => e.licenciatura === 'seguridad').nombre);
-  const opciones = { ...opcionesVacias, incluirVerano: true, veranoExtras: [6], veranoExtrasPorAnio: { 2028: [13] }, resultados: { 2: 'aprobada' }, finalesPrevistos: [15] };
+  const opciones = { ...opcionesVacias, incluirVerano: true, veranos: ['2027', '2029'], veranoExtras: [6], veranoExtrasPorAnio: { 2028: [13] }, resultados: { 2: 'aprobada' }, finalesPrevistos: [15] };
   P.guardarLicenciatura('seguridad');
   P.guardarElectivas({ [seg]: 'regular', 'green-software': 'abandono' });
   P.guardarPlan({ '2027-VER': [2] });

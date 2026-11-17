@@ -289,6 +289,14 @@ export const esVerano = (id) => tipoCuatri(id) === 'VER';
 export const nombrePeriodo = (id) => esVerano(id) ? `Intensivo de febrero ${id.slice(0, 4)}` : `${tipoCuatri(id) === '1C' ? '1º' : '2º'} cuatrimestre ${id.slice(0, 4)}`;
 const ordenPeriodo = (id) => Number(id.slice(0, 4)) * 3 + ({ VER: 0, '1C': 1, '2C': 2 }[tipoCuatri(id)] ?? 0);
 const BASICAS_VERANO = [1, 2, 3, 9, 10];
+/**
+ * ¿El intensivo de febrero del período `id` (AAAA-VER) está sumado al plan?
+ * `opciones.veranos` = años activos ['2027', …]. Sin esa lista se respeta el
+ * interruptor viejo `incluirVerano` (todos los febreros), para datos y tests previos.
+ */
+export const veranoActivo = (opciones = {}, id = '') => Array.isArray(opciones?.veranos)
+  ? opciones.veranos.map(String).includes(String(id).slice(0, 4))
+  : !!opciones?.incluirVerano;
 /** Oferta posible, no confirmación de apertura. Las excepcionales se incluyen solo al declararlas. */
 export const ofertaVerano = (opciones = {}, id = '2027-VER') => {
   const anio = id.slice(0, 4);
@@ -311,7 +319,7 @@ const PERMITE = { A: ['1C'], '1C': ['1C'], '2C': ['2C'], '1C-2C': ['1C', '2C'], 
 const ofrecida = (n, id, opciones = {}) => {
   const m = itemDe(n);
   if (!m || (m.desde && Number(id.slice(0, 4)) < m.desde)) return false;
-  return esVerano(id) ? !!opciones.incluirVerano && ofertaVerano(opciones, id).includes(n) : !!PERMITE[m.modalidad]?.includes(tipoCuatri(id));
+  return esVerano(id) ? veranoActivo(opciones, id) && ofertaVerano(opciones, id).includes(n) : !!PERMITE[m.modalidad]?.includes(tipoCuatri(id));
 };
 // Las anuales de 1C terminan al finalizar 2C del mismo año. Un intensivo termina
 // en febrero: agregar VER al calendario no transforma una anual en tres períodos.
@@ -411,7 +419,7 @@ export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Se
   for (const n of ns) {
     const m = itemDe(n); if (!m) continue;
     if (esVerano(id)) {
-      if (!opciones.incluirVerano) out.push(`${nombreCorto(n)}: el período de verano es opcional; activalo para incluirlo en la proyección.`);
+      if (!veranoActivo(opciones, id)) out.push(`${nombreCorto(n)}: el intensivo de febrero ${id.slice(0, 4)} no está sumado al plan; sumalo para incluirlo en la proyección.`);
       if (!ofertaVerano(opciones, id).includes(n)) out.push(`${nombreCorto(n)}: no pertenece a la oferta de verano prevista; solo agregarla si su intensivo fue confirmado.`);
     } else if (sinCursar(estadoDe(est, n)) && m.modalidad && !PERMITE[m.modalidad]?.includes(tipoCuatri(id))) {
       out.push(`${nombreCorto(n)}: se dicta ${m.modalidad === 'A' ? 'como anual, arrancando en el 1º cuatrimestre' : `solo en el ${tipoCuatri(id) === '1C' ? '2º' : '1º'} cuatrimestre`}.`);
@@ -446,7 +454,7 @@ export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones }
   const puestas = new Set(plan[ids[0]]);
   const falta = () => MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(est, m.n)) && !puestas.has(m.n));
   for (let i = 1; i < ids.length && falta().length; i++) {
-    if (esVerano(ids[i]) && !opciones.incluirVerano) continue;
+    if (esVerano(ids[i]) && !veranoActivo(opciones, ids[i])) continue;
     const proy = estadoEnCuatri(est, plan, ids, i, opciones);
     let libre = hsLimite - horasDe(continuan(est, plan, ids, i, opciones));
     const cand = falta().filter((m) => estaHabilitada(proy, m.n) && ofrecida(m.n, ids[i], opciones)
@@ -472,9 +480,19 @@ export function razonEntrada(n) {
   if (relaciones.regular.length || relaciones.aprobada.length) partes.push('también deben cumplirse los demás requisitos de cada materia');
   const r = partes.join(' · '); return r[0].toUpperCase() + r.slice(1);
 }
-/** El Home conserva 1C/2C, incorporando febrero a la proyección solo si fue elegido. */
+/** Febreros activos (AAAA-VER) que caen dentro del rango de `ids`, sin importar si `ids` los trae. */
+const veranosEnRango = (ids, opciones) => {
+  if (!ids.length) return [];
+  const desde = ordenPeriodo(ids[0]); const hasta = ordenPeriodo(ids.at(-1)); const out = [];
+  for (let anio = Number(ids[0].slice(0, 4)); anio <= Number(ids.at(-1).slice(0, 4)); anio++) {
+    const id = `${anio}-VER`;
+    if (ordenPeriodo(id) >= desde && ordenPeriodo(id) <= hasta && veranoActivo(opciones, id)) out.push(id);
+  }
+  return out;
+};
+/** El Home conserva 1C/2C, incorporando a la proyección solo los febreros elegidos (por año). */
 export function planProximoAnio(est, ids = ['2026-2C', '2027-1C', '2027-2C'], opciones = {}) {
-  const timeline = opciones.incluirVerano ? [...new Set([...ids, `${ids.at(-1).slice(0, 4)}-VER`])].sort((a, b) => ordenPeriodo(a) - ordenPeriodo(b)) : ids;
+  const timeline = [...new Set([...ids.filter((id) => !esVerano(id) || veranoActivo(opciones, id)), ...veranosEnRango(ids, opciones)])].sort((a, b) => ordenPeriodo(a) - ordenPeriodo(b));
   const { plan } = proponerPlan(est, timeline, opciones);
   return ids.slice(1).map((id) => {
     const ns = plan[id] ?? [];
