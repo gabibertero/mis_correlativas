@@ -241,3 +241,32 @@ test.describe('planificador: intensivos de febrero por año', () => {
     expect((await page.evaluate((k) => JSON.parse(localStorage.getItem(k + 'opcionesPlan')), K)).veranos).toEqual(['2027', '2029']);
   });
 });
+
+test.describe('planificador: resaltado de deuda', () => {
+  // AM II cursando, AGA recursando (debe el final), Simulación nunca cursada.
+  const estado = { 9: { estado: 'cursando' }, 2: { estado: 'recursando' }, 1: { estado: 'aprobada' }, 17: { estado: 'aprobada' }, 28: { estado: 'pendiente' } };
+  test('marca solo lo que debés y deja de marcarlo si el plan lo resuelve antes', async ({ page }) => {
+    await page.goto('planificador/');
+    await guardarLS(page, 'estado', estado);
+    await guardarLS(page, 'plan', { '2026-2C': [2], '2027-1C': [22], '2027-2C': [32] });
+    await page.reload();
+    const numerico = page.locator('[data-cuatri="2027-1C"] li[data-materia="22"]');
+    await expect(numerico).toHaveAttribute('data-deuda', 'si');
+    await expect(numerico).toContainText('Depende de algo que debés');
+    await expect(numerico.locator('mark.deuda[data-deuda="reg"]')).toHaveText('Análisis Matemático II');
+    await expect(numerico.locator('mark.deuda[data-deuda="aprob"]')).toHaveText('Álgebra y Geometría Analítica');
+    await expect(numerico.locator('.requisitos-plan .sr-only').first()).toHaveText(/la debés: regularizala/);
+    // Ciencia de Datos pide Simulación regular, que nunca cursaste: no es deuda.
+    const datos = page.locator('[data-cuatri="2027-2C"] li[data-materia="32"]');
+    await expect(datos.locator('mark.deuda')).toHaveCount(0);
+    await expect(datos).not.toHaveAttribute('data-deuda', 'si');
+    // AM II en febrero 2027: ya no se resalta; AGA sigue debiendo el final.
+    await page.locator('[data-verano-sumar-anio]').selectOption('2027');
+    await page.locator('[data-accion="sumar-verano"]').click();
+    const v = page.locator('[data-cuatri="2027-VER"]');
+    await v.locator('[data-campo="materia"]').selectOption('9');
+    await v.locator('[data-accion="agregar-materia"]').click();
+    await expect(numerico.locator('mark.deuda[data-deuda="reg"]')).toHaveCount(0);
+    await expect(numerico.locator('mark.deuda[data-deuda="aprob"]')).toHaveText('Álgebra y Geometría Analítica');
+  });
+});

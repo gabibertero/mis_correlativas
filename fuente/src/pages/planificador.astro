@@ -168,6 +168,9 @@ const turnos = [
   li[data-tipo='licenciatura'] .insignia-tipo { background: var(--plan-lic-bg); color: var(--plan-lic); }
   li[data-tipo='licenciatura'] .insignia-cr { color: var(--plan-lic); border: 1px solid var(--plan-lic-borde); }
   /* Resaltador de deuda */
+  .s-nom > small.etiqueta-deuda { display: inline-flex; align-items: center; gap: var(--s-1); flex: 0 1 auto; min-width: 0; max-width: 100%; margin: var(--s-1) 0 2px; padding: 1px var(--s-2); border-radius: 999px; background: var(--plan-deuda-bg); color: var(--plan-deuda-t); font-weight: 800; }
+  .etiqueta-deuda::before { content: '!'; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--plan-deuda-t); color: var(--plan-deuda-bg); font-size: 10px; line-height: 1; }
+  .s-nom > small.requisitos-plan { color: var(--suave); }
   mark.deuda { background: var(--plan-deuda-bg); color: var(--plan-deuda-t); padding: 0 3px; border-radius: 3px; font-weight: 700; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .opciones-plan { flex-basis: 100%; display: grid; gap: var(--s-3); padding-top: var(--s-2); }
   .opciones-plan p, .carga-aclaracion { font-size: var(--t-xs); line-height: 1.5; }

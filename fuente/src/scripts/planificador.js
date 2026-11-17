@@ -44,24 +44,33 @@ let visibles = CUATRIS_VISIBLES;
 const decir = (t) => { const a = $('[data-estado-plan]'); if (a) a.textContent = t; };
 const guardarOpciones = () => guardarOpcionesPlan(opciones);
 
-function textoRequisitos(n) {
+const SIN_DEUDA = { reg: [], aprob: [] };
+/** «Para cursar · Regular: … · Final aprobado: …», con lo que debés resaltado (mark.deuda). */
+function textoRequisitos(n, deudas = SIN_DEUDA) {
   const m = itemDe(n);
-  if (m.correlativasConfirmadas === false) return 'Acceso al trayecto: Diseño regular o aprobada. Correlativas propias y dictado por confirmar.';
+  if (m.correlativasConfirmadas === false) return el('small', { class: 'requisitos-plan' }, 'Acceso al trayecto: Diseño regular o aprobada. Correlativas propias y dictado por confirmar.');
+  const nombre = (r, tipo) => (deudas[tipo].includes(r)
+    ? [el('mark', { class: 'deuda', dataset: { deuda: tipo, materia: r } }, M.nombreCorto(r)), el('span', { class: 'sr-only' }, tipo === 'reg' ? ' (la debés: regularizala)' : ' (debés el final)')]
+    : [M.nombreCorto(r)]);
+  const lista = (rs, tipo) => rs.flatMap((r, k) => (k ? [', ', ...nombre(r, tipo)] : nombre(r, tipo)));
   const partes = [];
-  if (m.reg.length) partes.push(`Regular: ${m.reg.map(M.nombreCorto).join(', ')}`);
-  if (m.aprob.length) partes.push(`Final aprobado: ${m.aprob.map(M.nombreCorto).join(', ')}`);
-  return partes.length ? `Para cursar · ${partes.join(' · ')}` : 'Para cursar: sin correlativas.';
+  if (m.reg.length) partes.push(['Regular: ', ...lista(m.reg, 'reg')]);
+  if (m.aprob.length) partes.push(['Final aprobado: ', ...lista(m.aprob, 'aprob')]);
+  return el('small', { class: 'requisitos-plan' }, ...(partes.length ? ['Para cursar · ', ...partes.flatMap((p, k) => (k ? [' · ', ...p] : p))] : ['Para cursar: sin correlativas.']));
 }
 
-function filaMateriaPlan(n, i) {
+function filaMateriaPlan(n, i, proyDeuda) {
   const elec = M.esElectiva(n); const m = itemDe(n); const tipo = tipoDe(n);
   const rec = recursar.has(n);
+  // Solo para cursados futuros (no lo que ya cursás o tenés regular sin recursar).
+  const deudas = proyDeuda && (M.sinCursar(M.estadoDe(est, n)) || rec) ? M.deudasDe(est, proyDeuda, n) : SIN_DEUDA;
+  const debe = deudas.reg.length + deudas.aprob.length > 0;
   const activos = periodosActivos(); const pos = activos.indexOf(ids[i]);
   const resultado = opciones.resultados[n] ?? opciones.resultado;
   const resultadoSelect = el('select', { dataset: { resultadoPlan: '', materia: n }, 'aria-label': `Resultado previsto de ${M.nombreCorto(n)}` },
     el('option', { value: 'regular' }, 'Solo regularizar'), el('option', { value: 'aprobada' }, 'Aprobar final / directa'));
   resultadoSelect.value = resultado;
-  return el('li', { draggable: 'true', dataset: { materia: n, hs: M.hsDe(n), recursar: rec ? 'si' : 'no', tipo, ...(elec && { electiva: 'si' }) } },
+  return el('li', { draggable: 'true', dataset: { materia: n, hs: M.hsDe(n), recursar: rec ? 'si' : 'no', tipo, ...(elec && { electiva: 'si' }), ...(debe && { deuda: 'si' }) } },
     el('span', { class: 'n num', ...(elec && { 'aria-hidden': 'true' }) }, tipo === 'electiva' ? 'E' : tipo === 'licenciatura' ? 'L' : etiquetaN(n)),
     el('span', { class: 's-nom' }, M.nombreCorto(n),
       elec ? el('small', { class: 'insignias-plan' },
@@ -69,7 +78,8 @@ function filaMateriaPlan(n, i) {
         el('span', { class: 'insignia-cr' }, `+${m.creditos} créditos`)) : el('small', {}, `${m.hs} hs semanales de referencia`),
       el('small', { class: 'modalidad', dataset: { modalidad: M.esVerano(ids[i]) ? 'Intensivo en febrero' : M.modalidadInfo(m).label } }, M.esVerano(ids[i]) ? 'Intensivo en febrero · oferta a confirmar' : M.modalidadInfo(m).label || 'Dictado a confirmar'),
       !M.esVerano(ids[i]) && M.esContracuatri(n, ids[i]) ? el('small', { class: 'contra-cuatri', dataset: { contracuatri: 'si' } }, 'Contracuatrimestre: menos cátedras') : null,
-      el('small', { class: 'requisitos-plan' }, textoRequisitos(n)),
+      debe ? el('small', { class: 'etiqueta-deuda' }, 'Depende de algo que debés') : null,
+      textoRequisitos(n, deudas),
       m.licenciatura && m.licenciatura !== licenciatura ? el('small', { class: 'contra-cuatri' }, 'Materia de otra licenciatura: no suma créditos a la selección actual.') : null,
       rec ? el('small', { class: 'marca-recursar', dataset: { marca: 'recursar' } }, 'Recursar') : null),
     chip(M.estadoDe(est, n)),
@@ -128,7 +138,7 @@ function pintarCuatris() {
     $('[data-slot-lista]', art).replaceChildren(...(ns.length || cont.length ? [
       ...cont.map((n) => el('li', { class: 'continua', dataset: { materia: n, continua: 'si' } }, el('span', { class: 'n num' }, M.esElectiva(n) ? 'E' : etiquetaN(n)),
         el('span', { class: 's-nom' }, M.nombreCorto(n), el('small', {}, `Anual: continúa el cursado · ${M.hsDe(n)} hs de referencia`)))),
-      ...M.ordenarPlan(ns).map((n) => filaMateriaPlan(n, i))] : [vacio(verano ? 'Sin intensivos. Usá febrero solo si decidís cursar y hay oferta.' : 'Sin materias. Agregá las que quieras cursar.')]));
+      ...(() => { const proy = M.proyeccionDeudas(est, plan, ids, i, opciones); return M.ordenarPlan(ns).map((n) => filaMateriaPlan(n, i, proy)); })()] : [vacio(verano ? 'Sin intensivos. Usá febrero solo si decidís cursar y hay oferta.' : 'Sin materias. Agregá las que quieras cursar.')]));
     const hs = M.horasCuatri(est, plan, ids, i, opciones);
     const limite = Number(art.dataset.hsLimite);
     $('[data-hs-total]', art).textContent = verano ? ns.length : hs;
