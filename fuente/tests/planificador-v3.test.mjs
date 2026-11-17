@@ -1,10 +1,12 @@
-// Planificador v3: febreros por año y proyección del Home con un solo verano.
+// Planificador v3: febreros por año, deudas resaltadas y proyección del Home con un solo verano.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as M from '../src/lib/motor.js';
 import { CUATRIS } from '../src/lib/progreso.js';
 
 const ids = ['2026-2C', '2027-VER', '2027-1C', '2027-2C', '2028-VER', '2028-1C', '2028-2C'];
+// Ejemplo del pedido: AM II cursando, AGA recursando (debe el final), Simulación nunca cursada.
+const real = { 9: { estado: 'cursando' }, 2: { estado: 'recursando' }, 1: { estado: 'aprobada' }, 17: { estado: 'aprobada' }, 28: { estado: 'pendiente' } };
 
 test('veranoActivo: por año con `veranos`; sin la lista respeta el interruptor viejo', () => {
   assert.equal(M.veranoActivo({ veranos: ['2027'] }, '2027-VER'), true);
@@ -44,6 +46,44 @@ test('planProximoAnio incluye solo los febreros activos dentro del rango', () =>
   const ids3 = ['2026-2C', '2027-VER', '2027-1C', '2027-2C'];
   assert.deepEqual(M.planProximoAnio(est, ids3, { veranos: [] }).map((c) => c.id), ['2027-VER', '2027-1C', '2027-2C']);
   assert.deepEqual(M.planProximoAnio(est, ids3, { veranos: [] })[0].items, []);
+});
+
+test('deudasDe: solo lo que empezaste y te falta cerrar, nunca lo que no cursaste', () => {
+  // Análisis Numérico: reg [9], aprob [1, 2]
+  assert.deepEqual(M.deudasDe(real, real, 22), { reg: [9], aprob: [2] });
+  // Ciencia de Datos: reg [28] (Simulación, nunca cursada) y aprob [17, 19] (19 pendiente): no es deuda
+  assert.deepEqual(M.deudasDe(real, real, 32), { reg: [], aprob: [] });
+  // Libre o abandono también son deuda (la empezaste); pendiente no.
+  assert.deepEqual(M.deudasDe({ 9: { estado: 'libre' }, 2: { estado: 'abandono' } }, {}, 22), { reg: [9], aprob: [2] });
+  assert.deepEqual(M.deudasDe({}, {}, 22), { reg: [], aprob: [] });
+  // Promoción y regular deben el final.
+  assert.deepEqual(M.deudasDe({ 1: { estado: 'promocion' }, 2: { estado: 'regular' } }, {}, 22).aprob, [1, 2]);
+  // Si el proyectado ya la resuelve, no se marca.
+  assert.deepEqual(M.deudasDe(real, { ...real, 9: { estado: 'regular' }, 2: { estado: 'aprobada' } }, 22), { reg: [], aprob: [] });
+  // Licenciaturas con correlativas sin confirmar no informan deudas.
+  const lic = M.idElectiva({ nombre: 'Criptografía y Seguridad Criptográfica' });
+  assert.deepEqual(M.deudasDe({ 23: { estado: 'cursando' } }, {}, lic), { reg: [], aprob: [] });
+  // Electivas habituales sí: Backend pide 13 y 14 regulares y 6 aprobada.
+  assert.deepEqual(M.deudasDe({ 13: { estado: 'libre' }, 6: { estado: 'regular' } }, {}, 'e:backend-de-aplicaciones'), { reg: [13], aprob: [6] });
+});
+
+test('proyeccionDeudas: la cursada actual sigue siendo deuda; un período futuro del plan la resuelve', () => {
+  const i = ids.indexOf('2027-2C');
+  // Plan por defecto: lo que cursás hoy en el período actual.
+  const actual = { '2026-2C': [9, 2] };
+  assert.deepEqual(M.deudasDe(real, M.proyeccionDeudas(real, actual, ids, i, {}), 22), { reg: [9], aprob: [2] });
+  // estadoEnCuatri, en cambio, supone que la cursada actual regulariza.
+  assert.equal(M.estadoDe(M.estadoEnCuatri(real, actual, ids, i, {}), 9), 'regular');
+  // AM II en el intensivo de febrero 2027: ya no se resalta; AGA sigue debiendo el final.
+  const conFebrero = { ...actual, '2027-VER': [9] };
+  assert.deepEqual(M.deudasDe(real, M.proyeccionDeudas(real, conFebrero, ids, i, { veranos: ['2027'] }), 22), { reg: [], aprob: [2] });
+  // Si el febrero no está sumado, no resuelve nada.
+  assert.deepEqual(M.deudasDe(real, M.proyeccionDeudas(real, conFebrero, ids, i, { veranos: [] }), 22).reg, [9]);
+  // Final de AGA previsto (finalesPrevistos) y aprobable: deja de ser deuda.
+  const conFinal = M.proyeccionDeudas(real, conFebrero, ids, i, { veranos: ['2027'], finalesPrevistos: [2] });
+  assert.deepEqual(M.deudasDe(real, conFinal, 22), { reg: [], aprob: [] });
+  // Simulación sin cursar nunca aparece como deuda de Ciencia de Datos.
+  assert.deepEqual(M.deudasDe(real, M.proyeccionDeudas(real, actual, ids, i, {}), 32), { reg: [], aprob: [] });
 });
 
 test('CUATRIS trae febreros 2027–2033 (años válidos para `veranos`)', () => {

@@ -445,6 +445,36 @@ export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Se
   if (hs > hsLimite) out.push(`Te pasás por ${hs - hsLimite} hs del límite de ${hsLimite} hs semanales (límite provisorio).`);
   return out;
 }
+// Deuda = una correlativa que ya empezaste y todavía te falta cerrar. Lo que nunca cursaste
+// (pendiente) no es deuda: ese caso lo cubren los avisos de correlativas.
+const EMPEZADA_SIN_REGULARIZAR = new Set(['cursando', 'libre', 'abandono']);
+const EMPEZADA_SIN_FINAL = new Set(['regular', 'recursando', 'promocion', 'cursando', 'libre', 'abandono']);
+/**
+ * Correlativas de `n` que bloquean su cursado porque las DEBÉS. `real` = estado real de hoy;
+ * `proy` = estado proyectado al comenzar el período (estadoEnCuatri), así lo que el plan ya
+ * resuelve antes no se marca. -> { reg: [Nº que falta regularizar], aprob: [Nº con final adeudado] }
+ * Las asignaturas con correlativas sin confirmar (licenciaturas) no informan deudas.
+ */
+export function deudasDe(real, proy, n) {
+  const m = itemDe(n);
+  if (!m || m.correlativasConfirmadas === false) return { reg: [], aprob: [] };
+  return {
+    reg: (m.reg ?? []).filter((r) => !regOk(estadoDe(proy, r)) && EMPEZADA_SIN_REGULARIZAR.has(estadoDe(real, r))),
+    aprob: (m.aprob ?? []).filter((r) => !aprobada(proy, r) && EMPEZADA_SIN_FINAL.has(estadoDe(real, r))),
+  };
+}
+/**
+ * Proyección para marcar deudas al comenzar el período i: igual que estadoEnCuatri, pero sin
+ * suponer que lo que cursás HOY termina bien. Lo que te falta cerrar de la cursada actual
+ * sigue siendo deuda hasta que lo cargues como regular/aprobada o lo resuelva un período futuro del plan.
+ */
+export function proyeccionDeudas(est, plan, ids, i, opciones = {}) {
+  const cursando = Object.entries(est ?? {}).filter(([, d]) => d?.estado === 'cursando').map(([n]) => (esElectiva(n) ? n : Number(n)));
+  if (!cursando.length) return estadoEnCuatri(est, plan, ids, i, opciones);
+  const base = aplicar(est, Object.fromEntries(cursando.map((n) => [n, 'pendiente'])));
+  const planSinActual = { ...plan, [ids[0]]: (plan[ids[0]] ?? []).filter((n) => !cursando.includes(n)) };
+  return estadoEnCuatri(base, planSinActual, ids, i, opciones);
+}
 export const notasCuatri = (plan, ids, i) => (plan[ids[i]] ?? []).filter((n) => esContracuatri(n, ids[i])).map((n) => `${nombreCorto(n)}: contracuatrimestre · menos cátedras.`);
 /** Propuesta conservadora de cursado. Los pendientes bloqueados quedan explícitos en sinUbicar. */
 export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones } = {}) {
