@@ -13,7 +13,7 @@ function aplicar() {
   const q = sinTildes(buscar.value.trim());
   let visibles = 0;
   for (const li of filas) {
-    const ok = filtro === 'todas' || (filtro === 'hab' ? li.dataset.habilitada === 'si' : li.dataset.nivel === filtro);
+    const ok = li.dataset.activa !== 'no' && (filtro === 'todas' || (filtro === 'hab' ? li.dataset.habilitada === 'si' : filtro === 'trayecto' ? Boolean(li.dataset.licenciatura) : !li.dataset.licenciatura && li.dataset.nivel === filtro));
     const coincide = ok && sinTildes($('h3', li).textContent).includes(q);
     li.hidden = !coincide;
     if (coincide) visibles++;
@@ -29,5 +29,6 @@ botones.forEach((b) => b.addEventListener('click', () => {
 buscar.addEventListener('input', aplicar);
 // El estado de una fila puede cambiar su "habilitada": se reaplica después del handler de electivas.js
 $('.filas').addEventListener('change', aplicar);
+document.addEventListener('electivas-pintadas', aplicar);
 barra.hidden = false;
 aplicar();

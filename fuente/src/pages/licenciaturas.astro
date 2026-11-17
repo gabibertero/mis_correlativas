@@ -1,0 +1,117 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { LICENCIATURAS, CATALOGO_ELECTIVAS, ESTADOS_ELECTIVAS } from '../data/trayectos.js';
+import { ETIQUETA } from '../lib/vista.js';
+import { slug } from '../lib/motor.js';
+const base = import.meta.env.BASE_URL;
+const fuente = 'https://www.frc.utn.edu.ar/novedades/2026/licenciaturas-en-seguridad-informatica-y-en-inteligencia-artificial-los-nuevos-trayectos-de-la-carrera-ingenieria-en-sistemas-de-informacion/';
+---
+<Layout titulo="Licenciaturas" descripcion="Elegí un trayecto de licenciatura y seguí sus nuevas materias junto a Ingeniería en Sistemas.">
+  <header class="cab">
+    <p class="eyebrow">Un trayecto a elección</p>
+    <h1>Licenciaturas</h1>
+    <p class="lead">Seguí Ingeniería y una licenciatura en el mismo lugar.</p>
+    <p class="suave">Las materias que ya pertenecen a Sistemas conservan su estado en la malla. Las nuevas materias de tu licenciatura elegida suman 3 créditos electivos cada una cuando las aprobás.</p>
+  </header>
+
+  <section class="card eleccion-trayecto" aria-labelledby="h-eleccion">
+    <div>
+      <h2 id="h-eleccion">Mi licenciatura</h2>
+      <p class="suave">Elegí una sola opción. Cambiarla conserva tu historial, pero solo el trayecto elegido aporta créditos.</p>
+    </div>
+    <label class="lic-selector">Trayecto
+      <select data-licenciatura-selector>
+        <option value="">Todavía no elegí</option>
+        {LICENCIATURAS.map((lic) => <option value={lic.id}>{lic.nombre}</option>)}
+      </select>
+    </label>
+    <p class="aviso" data-licenciatura-guardada role="status" aria-live="polite">La elección se guarda automáticamente en tu cuenta. Esto no realiza una inscripción en la Facultad.</p>
+  </section>
+
+  <div class="opciones-lic" aria-label="Trayectos disponibles">
+    {LICENCIATURAS.map((lic) => (
+      <article class="card opcion-lic" data-licenciatura-opcion={lic.id}>
+        <h2>{lic.nombre}</h2>
+        <p class="suave">{lic.id === 'datos' ? 'Materias todavía no publicadas.' : `${CATALOGO_ELECTIVAS.filter((e) => e.licenciatura === lic.id).length} materias nuevas anunciadas.`}</p>
+        <p class="lic-elegida" hidden data-licenciatura-elegida>Tu elección</p>
+      </article>
+    ))}
+  </div>
+
+  <section class="card requisitos-lic" aria-labelledby="h-acceso">
+    <h2 id="h-acceso">Acceso al trayecto</h2>
+    <p>Para Seguridad Informática e Inteligencia Artificial, la publicación de la Facultad pide tener <strong>Diseño de Sistemas de Información regular o aprobada</strong> y <strong>no haberse recibido de Ingeniería en Sistemas</strong>. Podés estar cursando o haber dejado de cursar, con o sin título intermedio.</p>
+    <p class="aviso" data-licenciatura-acceso>Elegí una licenciatura para ver tu situación registrada.</p>
+    <p class="suave">Tu situación de egreso y la inscripción se verifican en la Facultad: completar las materias en esta app no certifica un título. La selección sirve para organizarte.</p>
+    <a href={fuente} target="_blank" rel="noreferrer">Ver publicación oficial y requisitos</a>
+  </section>
+
+  <section class="seccion" aria-labelledby="h-nuevas">
+    <header><h2 id="h-nuevas" data-licenciatura-titulo>Materias nuevas de mi licenciatura</h2><a href={`${base}electivas/`}>Ver todos mis créditos electivos</a></header>
+    <div class="card lic-resumen" data-licenciatura-resumen hidden>
+      <p><strong class="num" data-licenciatura-aprobadas>0</strong><span data-licenciatura-total> de 0 materias nuevas aprobadas</span></p>
+      <p><strong class="num" data-licenciatura-creditos>0</strong> créditos para Ingeniería</p>
+      <p class="suave" data-licenciatura-regularizadas></p>
+      <p class="suave">Este resumen contempla las materias nuevas anunciadas, no el avance total ni los requisitos completos del título.</p>
+    </div>
+    <p class="card aviso" data-licenciatura-sin-plan>Elegí una licenciatura para ver sus materias nuevas.</p>
+    <p class="suave lic-nota" data-licenciatura-nota hidden>Las correlativas particulares y la modalidad de estas materias todavía no están confirmadas aquí. Cumplir el requisito de acceso no confirma la habilitación de cada asignatura. Los años indican su implementación anunciada, no una oferta ni un cupo garantizados.</p>
+    <ul class="lic-materias">
+      {CATALOGO_ELECTIVAS.filter((e) => e.licenciatura).map((e) => (
+        <li class="card lic-materia" data-licenciatura-materia={e.licenciatura} data-electiva={slug(e.nombre)} hidden>
+          <div>
+            <h3>{e.nombreOriginal ?? e.nombre}</h3>
+            <p class="suave">Implementación anunciada: {e.desde} · 3 créditos al aprobar</p>
+          </div>
+          <p class="lic-estado" data-licenciatura-estado><span class="chip" data-estado="pendiente">Pendiente</span></p>
+          <label>Estado de {e.nombreOriginal ?? e.nombre}
+            <select data-licenciatura-estado-selector>
+              {ESTADOS_ELECTIVAS.map((estado) => <option value={estado}>{ETIQUETA[estado]}</option>)}
+            </select>
+          </label>
+        </li>
+      ))}
+    </ul>
+  </section>
+  <section class="card lic-reglas" aria-labelledby="h-creditos-lic">
+    <h2 id="h-creditos-lic">Cómo se cuentan</h2>
+    <ul>
+      <li>Solo las materias nuevas aprobadas del trayecto elegido suman 3 créditos electivos cada una.</li>
+      <li>Regular, cursando, promoción, libre o abandono no suman créditos hasta la aprobación.</li>
+      <li>Las materias compartidas con Sistemas no se duplican ni se vuelven a contar como electivas.</li>
+      <li>Las materias nuevas no cambian el total de 36 materias obligatorias de Ingeniería.</li>
+    </ul>
+    <p class="suave">La asignación de 3 créditos es el criterio configurado para este seguimiento. El reconocimiento académico se confirma en la Facultad.</p>
+  </section>
+</Layout>
+<script>
+  import '../scripts/licenciaturas.js';
+</script>
+<style>
+  .eleccion-trayecto { display:grid; gap:var(--s-4); border-top:4px solid var(--acento2); }
+  .eleccion-trayecto h2,.requisitos-lic h2,.opcion-lic h2,.lic-reglas h2 { font-size:var(--t-l); margin-bottom:var(--s-2); }
+  .lic-selector { display:grid; gap:var(--s-2); font-weight:600; }
+  select { min-height:44px; width:100%; max-width:100%; font:inherit; color:var(--texto); background:var(--sup2); border:1px solid var(--borde-fuerte); border-radius:var(--r-s); padding:var(--s-2) var(--s-3); }
+  .lic-selector { display:grid; gap:var(--s-2); min-width:0; }
+  .lic-selector select { width:100%; min-width:0; max-width:100%; font:inherit; min-height:44px; padding:var(--s-2); border:1px solid var(--borde-fuerte); border-radius:var(--r-s); color:var(--texto); background:var(--sup2); }
+  .opciones-lic { display:grid; gap:var(--s-3); margin-block:var(--s-5); }
+  .opcion-lic { border-top:3px solid var(--borde); }
+  .opcion-lic[data-elegida='si'] { border-color:var(--acento); background:var(--acento-suave); }
+  .lic-elegida { color:var(--acento); font-weight:700; margin-top:var(--s-2); }
+  .requisitos-lic { display:grid; gap:var(--s-3); }
+  .requisitos-lic .aviso { border-left:3px solid var(--acento2); padding-left:var(--s-3); }
+  .lic-resumen { display:grid; gap:var(--s-2); border-left:4px solid var(--acento); margin-bottom:var(--s-3); }
+  .lic-resumen strong { font-size:var(--t-xl); color:var(--acento); }
+  .lic-nota { margin-bottom:var(--s-4); }
+  .lic-materias { list-style:none; display:grid; gap:var(--s-3); margin:0; padding:0; }
+  .lic-materia { display:grid; gap:var(--s-3); min-width:0; border-left:4px solid var(--borde); }
+  .lic-materia h3 { font-size:var(--t-m); overflow-wrap:break-word; }
+  .lic-materia p { margin:0; }
+  .lic-materia[data-estado='aprobada'] { border-left-color:var(--e-aprobada); }
+  .lic-materia[data-estado='regular'] { border-left-color:var(--acento2); }
+  .lic-materia label { display:grid; gap:var(--s-1); font-size:var(--t-xs); color:var(--suave); }
+  .lic-reglas { margin-top:var(--s-6); }
+  .lic-reglas ul { display:grid; gap:var(--s-2); padding-left:var(--s-5); }
+  .lic-reglas .suave { margin-top:var(--s-3); }
+  @media(min-width:800px) { .opciones-lic { grid-template-columns:repeat(3,minmax(0,1fr)); } .lic-materia { grid-template-columns:minmax(0,1fr) auto minmax(180px,240px); align-items:center; } .eleccion-trayecto { grid-template-columns:1fr minmax(260px,1fr); } .eleccion-trayecto .aviso { grid-column:1/-1; } }
+</style>

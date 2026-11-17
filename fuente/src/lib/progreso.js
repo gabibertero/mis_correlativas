@@ -1,17 +1,20 @@
 // Persistencia en localStorage (prefijo `corr:v1:`) + exportar/importar. ÚNICO lugar que toca localStorage
 // (salvo el tema, que lo maneja el Layout). Siempre en try/catch: si está bloqueado o roto, la app sigue
 // funcionando en memoria durante la visita.
-import { MATERIAS, ELECTIVAS, ESTADOS } from '../data/plan.js';
+import { MATERIAS, ESTADOS } from '../data/plan.js';
+import { CATALOGO_ELECTIVAS, LICENCIATURAS, ESTADOS_ELECTIVAS } from '../data/trayectos.js';
 import { slug, admiteNota } from './motor.js';
 
 export const PREFIJO = 'corr:v1:';
-// Los 3 primeros se ven siempre; el resto (hasta recibirse) aparece al usarlo o al proponer un plan.
-export const CUATRIS = ['2026-2C', '2027-1C', '2027-2C', '2028-1C', '2028-2C', '2029-1C', '2029-2C', '2030-1C', '2030-2C'];
+// Los veranos son períodos opcionales de febrero, anteriores al 1º cuatrimestre.
+// Mantener los IDs antiguos permite recuperar los planes ya guardados.
+export const CUATRIS = ['2026-2C', ...Array.from({ length: 7 }, (_, i) => `${2027 + i}`).flatMap((anio) => [`${anio}-VER`, `${anio}-1C`, `${anio}-2C`])];
 export const CUATRIS_VISIBLES = 3;
 export const TURNOS_EDITABLES = ['feb-mar-2027', 'jul-2027'];
 const NS = new Set(MATERIAS.map((m) => m.n));
-const IDS_ELECTIVAS = new Set(ELECTIVAS.map((e) => slug(e.nombre)));
-const IDS_PLAN = new Set([...NS, ...ELECTIVAS.map((e) => `e:${slug(e.nombre)}`)]); // materias (Nº) + electivas ('e:<slug>')
+const IDS_ELECTIVAS = new Set(CATALOGO_ELECTIVAS.map((e) => slug(e.nombre)));
+const IDS_PLAN = new Set([...NS, ...CATALOGO_ELECTIVAS.map((e) => `e:${slug(e.nombre)}`)]); // materias (Nº) + electivas ('e:<slug>')
+const IDS_LICENCIATURAS = new Set(LICENCIATURAS.map((l) => l.id));
 const MAX_BYTES = 200_000;
 
 const memoria = new Map();
@@ -97,8 +100,37 @@ export function limpiarFinales(obj) {
 }
 export function limpiarElectivas(obj) {
   const out = {};
-  if (esObj(obj)) for (const [k, v] of Object.entries(obj)) if (IDS_ELECTIVAS.has(k) && (v === 'aprobada' || v === 'cursando')) out[k] = v;
+  // Pendiente se representa por ausencia, igual que en los respaldos anteriores.
+  if (esObj(obj)) for (const [k, v] of Object.entries(obj)) if (IDS_ELECTIVAS.has(k) && ESTADOS_ELECTIVAS.includes(v) && v !== 'pendiente') out[k] = v;
   return out;
+}
+
+/** Una única elección por cuenta; cambiarla no borra estados de otros trayectos. */
+export const limpiarLicenciatura = (id) => IDS_LICENCIATURAS.has(id) ? id : null;
+
+/** Hipótesis explícitas del plan: por defecto terminar un cursado lo deja regular. */
+export function limpiarOpcionesPlan(obj) {
+  const o = esObj(obj) ? obj : {};
+  const listaIds = (lista, validos) => Array.isArray(lista) ? [...new Set(lista.filter((id) => validos.has(id)))] : [];
+  const resultados = {};
+  if (esObj(o.resultados)) for (const [key, resultado] of Object.entries(o.resultados)) {
+    const id = /^\d+$/.test(key) ? Number(key) : key;
+    if (IDS_PLAN.has(id) && (resultado === 'regular' || resultado === 'aprobada')) resultados[id] = resultado;
+  }
+  const veranoExtrasPorAnio = {};
+  if (esObj(o.veranoExtrasPorAnio)) for (const [anio, lista] of Object.entries(o.veranoExtrasPorAnio)) {
+    if (/^20\d{2}$/.test(anio) && CUATRIS.includes(`${anio}-VER`)) veranoExtrasPorAnio[anio] = listaIds(lista, NS);
+  }
+  return {
+    incluirVerano: o.incluirVerano === true,
+    // La lista plana es compatibilidad del primer verano (2027). Las nuevas
+    // confirmaciones se guardan por año: la oferta excepcional no se repite sola.
+    veranoExtras: listaIds(o.veranoExtras, NS),
+    veranoExtrasPorAnio,
+    resultado: o.resultado === 'aprobada' ? 'aprobada' : 'regular',
+    resultados,
+    finalesPrevistos: listaIds(o.finalesPrevistos, IDS_PLAN),
+  };
 }
 
 /** Perfil (viaja con la cuenta): nombre (máx 40), color de la whitelist, modo claro/oscuro (null = seguir al sistema). */
@@ -125,6 +157,10 @@ export const cargarFinales = () => limpiarFinales(leer('finales'));
 export const guardarFinales = (f) => guardar('finales', f);
 export const cargarElectivas = () => limpiarElectivas(leer('electivas'));
 export const guardarElectivas = (e) => guardar('electivas', e);
+export const cargarLicenciatura = () => limpiarLicenciatura(leer('licenciatura'));
+export const guardarLicenciatura = (id) => guardar('licenciatura', limpiarLicenciatura(id));
+export const cargarOpcionesPlan = () => limpiarOpcionesPlan(leer('opcionesPlan'));
+export const guardarOpcionesPlan = (o) => guardar('opcionesPlan', limpiarOpcionesPlan(o));
 export const cargarNombre = () => limpiarNombre(leer('nombre'));
 export const guardarNombre = (n) => guardar('nombre', limpiarNombre(n));
 export const cargarTemaColor = () => limpiarTemaColor(leer('temaColor'));
@@ -134,7 +170,7 @@ export const guardarTemaModo = (m) => guardar('temaModo', limpiarTemaModo(m));
 
 // ---------- Exportar / importar ----------
 export function armarExport() {
-  return { app: 'correlativas', version: 1, exportado: new Date().toISOString(), estado: cargarEstado(), plan: cargarPlan() ?? {}, recursar: cargarRecursar(), fechas: cargarFechas(), finales: cargarFinales(), electivas: cargarElectivas(), nombre: cargarNombre(), temaColor: cargarTemaColor(), temaModo: cargarTemaModo() };
+  return { app: 'correlativas', version: 1, exportado: new Date().toISOString(), estado: cargarEstado(), plan: cargarPlan() ?? {}, recursar: cargarRecursar(), fechas: cargarFechas(), finales: cargarFinales(), electivas: cargarElectivas(), licenciatura: cargarLicenciatura(), opcionesPlan: cargarOpcionesPlan(), nombre: cargarNombre(), temaColor: cargarTemaColor(), temaModo: cargarTemaModo() };
 }
 /** Valida el texto de un archivo. -> { ok:true, datos } | { ok:false, error } */
 export function validarImport(texto) {
@@ -145,9 +181,10 @@ export function validarImport(texto) {
   if (!esObj(j.estado)) return { ok: false, error: 'Al respaldo le falta el estado de las materias.' };
   const estado = limpiarEstado(j.estado);
   if (Object.keys(j.estado).length && !Object.keys(estado).length) return { ok: false, error: 'Ninguna materia del archivo es válida.' };
-  return { ok: true, datos: { estado, plan: limpiarPlan(j.plan), recursar: limpiarRecursar(j.recursar), fechas: limpiarFechas(j.fechas), finales: limpiarFinales(j.finales), electivas: limpiarElectivas(j.electivas), nombre: limpiarNombre(j.nombre), temaColor: limpiarTemaColor(j.temaColor), temaModo: limpiarTemaModo(j.temaModo) } };
+  return { ok: true, datos: { estado, plan: limpiarPlan(j.plan), recursar: limpiarRecursar(j.recursar), fechas: limpiarFechas(j.fechas), finales: limpiarFinales(j.finales), electivas: limpiarElectivas(j.electivas), licenciatura: limpiarLicenciatura(j.licenciatura), opcionesPlan: limpiarOpcionesPlan(j.opcionesPlan), nombre: limpiarNombre(j.nombre), temaColor: limpiarTemaColor(j.temaColor), temaModo: limpiarTemaModo(j.temaModo) } };
 }
-export function aplicarImport({ estado, plan, recursar = [], fechas, finales = {}, electivas, nombre = '', temaColor = 'verde', temaModo = null }) {
+export function aplicarImport({ estado, plan, recursar = [], fechas, finales = {}, electivas, licenciatura = null, opcionesPlan = {}, nombre = '', temaColor = 'verde', temaModo = null }) {
   guardarEstado(estado); guardarPlan(plan); guardarRecursar(recursar); guardarFechas(fechas); guardarFinales(finales); guardarElectivas(electivas);
+  guardarLicenciatura(licenciatura); guardarOpcionesPlan(opcionesPlan);
   guardarNombre(nombre); guardarTemaColor(temaColor); guardarTemaModo(temaModo);
 }

@@ -3,7 +3,17 @@
 Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
+### Agregado
+- Períodos opcionales de febrero, con básicas y oferta excepcional de Sistemas confirmada por año.
+- Resultados de cursado y finales previstos explícitos en el planificador, sin aprobar materias automáticamente.
+- Simulación de todos los estados de obligatorias y electivas, con comparación de créditos y habilitaciones ganadas o perdidas.
+- Elección única de licenciatura: Seguridad Informática, Inteligencia Artificial o Ciencia de Datos (plan aún pendiente de publicación).
+- Seguimiento de las materias nuevas anunciadas de Seguridad e IA, con 3 créditos por aprobación del trayecto elegido, sin duplicar materias compartidas.
+
 ### Corregido
+- Correlativas para rendir según la Ordenanza 1878: se respetan las columnas de cursadas y aprobadas, en lugar de exigir todos los finales.
+- Dependencias directas e indirectas separadas del efecto real de regularizar o aprobar una materia.
+- Electivas con regularidad, libre, abandono y los demás estados académicos; conservación en respaldos y sincronización.
 - Cantidades del anillo y del paso «Hoy» sincronizadas con el progreso de la cuenta.
 - HTML inicial sin estados ni notas personales históricos.
 - Resumen actualizado al volver desde la malla o cambiar el progreso en otra pestaña.

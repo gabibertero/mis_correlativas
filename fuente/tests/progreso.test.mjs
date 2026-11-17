@@ -86,7 +86,7 @@ test('importar rechaza archivos inválidos con mensaje', () => {
 test('importar acepta estado vacío y sanea partes opcionales rotas', () => {
   const v = P.validarImport('{"app":"correlativas","version":1,"estado":{},"plan":"roto","fechas":[1],"electivas":7}');
   assert.ok(v.ok);
-  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, finales: {}, electivas: {}, nombre: '', temaColor: 'verde', temaModo: null });
+  assert.deepEqual(v.datos, { estado: {}, plan: {}, recursar: [], fechas: {}, finales: {}, electivas: {}, licenciatura: null, opcionesPlan: { incluirVerano: false, veranoExtras: [], veranoExtrasPorAnio: {}, resultado: 'regular', resultados: {}, finalesPrevistos: [] }, nombre: '', temaColor: 'verde', temaModo: null });
 });
 
 test('limpiarPlan acepta electivas (e:<slug>) y descarta ids inventados', async () => {

@@ -64,12 +64,27 @@ function pintarPanel() {
   const ff = M.queFaltaParaFinal(est, n);
   llenar(lista('falta-final'), e === 'aprobada' ? [] : [
     ...(ff.regular ? [item(n, false, 'Tenerla regular: ')] : []),
+    ...(ff.reg ?? []).map((r) => item(r, false, 'Regularizar: ')),
     ...ff.aprobar.map((r) => item(r, false, 'Aprobar: ')),
     ...ff.extra.map((t) => el('li', {}, `Además: ${t} (no se registra en la app).`)),
   ], e === 'aprobada' ? 'Ya la aprobaste.' : 'Nada: ya cumplís todo.');
 
-  const d = [...M.destraba(n)].sort((a, b) => a - b);
-  llenar(lista('destraba'), d.map((x) => fila(x, `${etiquetaN(x)} · ${M.nombreCorto(x)}`)), 'No destraba otras materias.');
+  const rel = M.relacionesDe(n);
+  llenar(lista('destraba'), [
+    ...rel.regular.map((x) => fila(x, `${M.nombreCorto(x)}: para cursarla, esta materia debe estar regular o aprobada.`)),
+    ...rel.aprobada.map((x) => fila(x, `${M.nombreCorto(x)}: para cursarla, esta materia debe estar aprobada.`)),
+    ...rel.indirectas.map((x) => fila(x, `${M.nombreCorto(x)}: dependencia indirecta, con materias intermedias.`)),
+  ], 'No hay materias del plan que dependan de esta.');
+  const efectos = (estado) => {
+    const impacto = M.impactoReal(est, n, estado);
+    return [
+      ...impacto.cursar.map((x) => fila(x, `Nuevo cursado habilitado: ${M.nombreCorto(x)}.`)),
+      ...impacto.finales.map((x) => fila(x, `Nuevo final habilitado: ${M.nombreCorto(x)}.`)),
+    ];
+  };
+  const yaRegular = ['regular', 'recursando', 'promocion', 'aprobada'].includes(e);
+  llenar(lista('efecto-regular'), yaRegular ? [] : efectos('regular'), yaRegular ? 'Ya tenés alcanzada la regularidad de esta materia.' : 'Regularizarla no agrega habilitaciones con tu estado actual.');
+  llenar(lista('efecto-aprobada'), e === 'aprobada' ? [] : efectos('aprobada'), e === 'aprobada' ? 'Ya aprobaste esta materia.' : 'Aprobarla no agrega habilitaciones con tu estado actual.');
   panel.hidden = false;
 }
 

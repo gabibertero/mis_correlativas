@@ -51,10 +51,11 @@ test('habilitada exige estar pendiente', () => {
   assert.equal(M.estaHabilitada(T(1), 1), false);
 });
 
-test('final: regular + todas las correlativas aprobadas', () => {
+test('final: regular + correlativas cursadas/aprobadas según sus columnas', () => {
   const base = { 9: { estado: 'regular' }, 1: { estado: 'aprobada' }, 2: { estado: 'regular' } };
-  assert.equal(M.puedeRendirFinal(base, 9), false); // 2 solo regular
-  assert.deepEqual(M.queFaltaParaFinal(base, 9).aprobar, [2]);
+  assert.equal(M.puedeRendirFinal(base, 9), true); // 2 regular alcanza en la columna Cursadas
+  assert.deepEqual(M.queFaltaParaFinal(base, 9).aprobar, []);
+  assert.deepEqual(M.queFaltaParaFinal({ ...base, 2: { estado: 'pendiente' } }, 9).reg, [2]);
   assert.equal(M.puedeRendirFinal({ ...base, 2: { estado: 'aprobada' } }, 9), true);
   assert.equal(M.puedeRendirFinal({ ...base, 2: { estado: 'aprobada' }, 9: { estado: 'cursando' } }, 9), false); // no es regular
   assert.equal(M.queFaltaParaFinal({ 1: { estado: 'aprobada' }, 2: { estado: 'aprobada' } }, 9).regular, true);
@@ -147,7 +148,7 @@ test('veredicto: textos según el caso', () => {
   assert.equal(M.veredicto({}, 1).tono, 'ok');
   assert.match(M.veredicto({}, 9).texto, /Todavía no podés cursarla: te falta regularizar/);
   assert.equal(M.veredicto({}, 9).tono, 'falta');
-  assert.equal(M.veredicto({ 1: { estado: 'regular' }, 2: { estado: 'regular' }, 9: { estado: 'regular' } }, 9).tono, 'falta');
+  assert.equal(M.veredicto({ 1: { estado: 'regular' }, 2: { estado: 'regular' }, 9: { estado: 'regular' } }, 9).tono, 'ok');
   assert.equal(M.veredicto(ESTADO_INICIAL, 28).tono, 'espera');
   assert.match(M.veredicto(ESTADO_INICIAL, 15).texto, /Podés rendir/);
   assert.equal(M.veredicto(ESTADO_INICIAL, 9).texto, 'La estás cursando.');
@@ -165,7 +166,8 @@ test('propiedades con 300 estados aleatorios', () => {
       assert.equal(hab.has(m.n), ['pendiente', 'libre', 'abandono'].includes(e) && cursar && !m.opcional);
       if (M.puedeRendirFinal(est, m.n)) {
         assert.ok(['regular', 'recursando', 'promocion'].includes(e));
-        for (const r of [...m.reg, ...m.aprob]) assert.equal(M.estadoDe(est, r), 'aprobada', `seed ${seed} final ${m.n}`); // final ⊆ reg ∪ aprob aprobadas
+        for (const r of m.reg) assert.ok(['regular', 'recursando', 'promocion', 'aprobada'].includes(M.estadoDe(est, r)), `seed ${seed} final cursada ${m.n}`);
+        for (const r of m.aprob) assert.equal(M.estadoDe(est, r), 'aprobada', `seed ${seed} final aprobada ${m.n}`);
         assert.ok(M.puedeCursar(est, m.n), 'quien rinde el final también cumple las de cursar');
       }
       const sd = M.seDesbloquea(est, m.n);
@@ -243,9 +245,9 @@ test('fechas: diasHasta y proximaMesa', () => {
 });
 
 test('planificador: previas proyectadas, avisos y horas', () => {
-  // cuatrimestres previos quedan aprobados: Calidad (25) con Diseño (23) antes
+  // Los cursos previos se proyectan regulares: Calidad solo pide Diseño regular.
   const proy = M.proyectarPrevias(ESTADO_INICIAL, [23]);
-  assert.equal(M.estadoDe(proy, 23), 'aprobada');
+  assert.equal(M.estadoDe(proy, 23), 'regular');
   assert.equal(M.estadoDe(ESTADO_INICIAL, 23), 'pendiente'); // no muta
   assert.deepEqual(M.avisosMateria(proy, 25), []);
   const av = M.avisosMateria(ESTADO_INICIAL, 25);
@@ -288,8 +290,8 @@ test('conteos extremos: cuenta vacía y cada estado aplicado a todo el plan', ()
     const r = M.resumen(est);
     const aprobadas = estado === 'aprobada' ? 36 : 0;
     const cursando = estado === 'cursando' ? 36 : 0;
-    // Con todas regulares/recursando/promocionadas solo las 9 sin correlativas tienen final habilitado.
-    const finales = ['regular', 'recursando', 'promocion'].includes(estado) ? 9 : 0;
+    // Las columnas Cursadas no requieren finales: se habilitan las 20 sin exigencias de Aprobadas.
+    const finales = ['regular', 'recursando', 'promocion'].includes(estado) ? 20 : 0;
     assert.deepEqual([r.aprobadas, r.proyCursando.n, r.proyFinales.n, r.finales],
       [aprobadas, aprobadas + cursando, aprobadas + cursando + finales, finales], estado);
     assert.equal(r.pct, estado === 'aprobada' ? 100 : 0, estado);
@@ -360,8 +362,9 @@ test('créditos: el Seminario aprobado suma 6 solo a Ingeniería', () => {
 const IDS = ['2026-2C', '2027-1C', '2027-2C', '2028-1C', '2028-2C', '2029-1C', '2029-2C', '2030-1C', '2030-2C'];
 const fijoGabi = MATERIAS.filter((m) => M.estadoDe(ESTADO_INICIAL, m.n) === 'cursando').map((m) => m.n);
 
-test('proponer: plan válido para Gabi (correlativas, modalidad, horas, sin repetir, completo)', () => {
-  const { plan, sinUbicar } = M.proponerPlan(ESTADO_INICIAL, IDS, { fijo: fijoGabi });
+test('proponer: plan completo para Gabi solo con finales previstos y aprobación explícita', () => {
+  const opciones = { resultado: 'aprobada', finalesPrevistos: MATERIAS_PLAN.map((m) => m.n) };
+  const { plan, sinUbicar } = M.proponerPlan(ESTADO_INICIAL, IDS, { ...opciones, fijo: fijoGabi });
   assert.deepEqual(sinUbicar, []);
   assert.deepEqual(plan[IDS[0]], fijoGabi);
   const todasPuestas = Object.values(plan).flat();
@@ -370,7 +373,7 @@ test('proponer: plan válido para Gabi (correlativas, modalidad, horas, sin repe
   // lo que falta del plan quedó ubicado
   const faltan = MATERIAS.filter((m) => !m.opcional && !['aprobada', 'regular', 'recursando', 'promocion'].includes(M.estadoDe(ESTADO_INICIAL, m.n))).map((m) => m.n).sort((a, b) => a - b);
   assert.deepEqual([...todasPuestas].sort((a, b) => a - b), faltan);
-  IDS.forEach((_, i) => assert.deepEqual(M.avisosCuatri(ESTADO_INICIAL, plan, IDS, i), [], `cuatri ${IDS[i]}`));
+  IDS.forEach((_, i) => assert.deepEqual(M.avisosCuatri(ESTADO_INICIAL, plan, IDS, i, 30, new Set(), opciones), [], `cuatri ${IDS[i]}`));
 });
 
 // Horizonte más largo: con muchos libre/abandono (equivalen a pendiente) la cadena de correlativas no entra en 9 cuatrimestres.
@@ -381,12 +384,13 @@ test('proponer: propiedades con 150 estados aleatorios', () => {
     const est = aleatorio(r);
     const fijo = MATERIAS.filter((m) => M.estadoDe(est, m.n) === 'cursando').map((m) => m.n);
     const hsLimite = 12 + Math.floor(r() * 25);
-    const { plan, sinUbicar } = M.proponerPlan(est, IDS_LARGO, { hsLimite, fijo });
+    const opciones = { resultado: 'aprobada', finalesPrevistos: MATERIAS_PLAN.map((m) => m.n) };
+    const { plan, sinUbicar } = M.proponerPlan(est, IDS_LARGO, { ...opciones, hsLimite, fijo });
     const puestas = Object.values(plan).flat();
     assert.equal(new Set(puestas).size, puestas.length, `seed ${seed} repetidas`);
     IDS_LARGO.forEach((_, i) => {
       assert.ok(M.horasCuatri(est, plan, IDS_LARGO, i) <= Math.max(hsLimite, i === 0 ? Infinity : 0), `seed ${seed} horas ${i}`);
-      if (i > 0) assert.deepEqual(M.avisosCuatri(est, plan, IDS_LARGO, i, hsLimite), [], `seed ${seed} cuatri ${i}`);
+      if (i > 0) assert.deepEqual(M.avisosCuatri(est, plan, IDS_LARGO, i, hsLimite, new Set(), opciones), [], `seed ${seed} cuatri ${i}`);
     });
     // lo que no se ubicó es porque una sola materia no entra en el límite o no alcanzaron los cuatrimestres
     for (const n of sinUbicar) assert.ok(!puestas.includes(n));
@@ -441,9 +445,10 @@ test('planificador: electiva sin correlativas avisa; modalidad fuera de cuatri a
   assert.ok(av.some((t) => /Backend de Aplicaciones: falta regularizar/.test(t)));
   assert.ok(av.some((t) => /Backend de Aplicaciones: falta el final aprobado de/.test(t)));
   assert.ok(av.some((t) => /solo en el 2º cuatrimestre/.test(t)));
-  // lo del cuatri previo del plan cuenta como aprobado (6, 13, 14 en 2026-2C -> Backend en 2027-2C)
-  const ok = { '2026-2C': [6, 13, 14], '2027-1C': [], '2027-2C': [id] };
-  assert.deepEqual(M.avisosCuatri({}, ok, ids, 2).filter((t) => t.startsWith('Backend')), []);
+  // Cursos previos válidos dejan 13 y 14 regulares; el final de 6 se planifica explícitamente.
+  const base = { ...T(5), 6: { estado: 'regular' } };
+  const ok = { '2026-2C': [], '2027-1C': [13, 14], '2027-2C': [id] };
+  assert.deepEqual(M.avisosCuatri(base, ok, ids, 2, 30, new Set(), { finalesPrevistos: [6] }).filter((t) => t.startsWith('Backend')), []);
 });
 test('planificador: cualquier electiva en cualquier cuatri no rompe y suma créditos (semillas)', () => {
   const ids = ['2026-2C', '2027-1C', '2027-2C', '2028-1C'];
@@ -537,7 +542,7 @@ test('semántica: la nota solo la admiten aprobada y promoción; el Seminario so
   assert.deepEqual(M.creditos({}, ELECTIVAS, { 99: { estado: 'promocion' } }), { ing: 0, analista: 0 });
 });
 
-test('planificador: promoción se asume rendida y no se vuelve a proponer', () => {
+test('planificador: promoción no se vuelve a proponer; asumirRendidos es solo un escenario explícito', () => {
   const est = { ...T(1, 2), 18: { estado: 'promocion' } };
   assert.equal(M.estadoDe(M.asumirRendidos(est), 18), 'aprobada');
   const { plan } = M.proponerPlan(est, IDS);

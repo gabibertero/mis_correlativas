@@ -1,16 +1,20 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
-import { MODALIDAD, falta, nombreCorto, slug } from '../lib/vista.js';
+import { MODALIDAD, falta, nombreCorto, slug, ETIQUETA } from '../lib/vista.js';
+import { CATALOGO_ELECTIVAS, ESTADOS_ELECTIVAS } from '../data/trayectos.js';
 
-const lista = ELECTIVAS.map((e) => ({ ...e, id: slug(e.nombre), f: falta(e), ok: !falta(e).reg.length && !falta(e).aprob.length }));
-const habilitadas = lista.filter((e) => e.ok).length;
+const base = import.meta.env.BASE_URL;
+const lista = CATALOGO_ELECTIVAS.map((e) => ({ ...e, id: slug(e.nombre), f: falta(e), ok: !falta(e).reg.length && !falta(e).aprob.length }));
+const habilitadas = lista.filter((e) => !e.licenciatura && e.ok).length;
 ---
-<Layout titulo="Electivas" descripcion="Las 19 electivas del plan con sus créditos, correlativas y si ya las podés cursar.">
+<Layout titulo="Electivas" descripcion="Electivas y materias nuevas de tu licenciatura: estados, créditos y requisitos para cursar y rendir.">
   <header class="cab">
     <p class="eyebrow">{ELECTIVAS.length} materias electivas</p>
     <h1>Electivas</h1>
-    <p class="lead">Sumá créditos: {CREDITOS_INGENIERIA} para Ingeniería, y {CREDITOS_ANALISTA} de tercer nivel para Analista.</p>
+    <p class="lead">Sumá créditos: {CREDITOS_INGENIERIA} para Ingeniería, y {CREDITOS_ANALISTA} de tercer nivel para Analista. Solo las materias aprobadas suman créditos.</p>
+    <p class="suave">Podés registrar regularidad, promoción, libre o abandono sin perder tu historial. Los requisitos se informan para planificar; no bloquean la carga de tu estado.</p>
+    <p class="trayecto-enlace"><a class="btn" href={`${base}licenciaturas/`}>Elegir o revisar mi licenciatura</a><span class="suave" data-trayecto-electivas>Podés sumar las materias nuevas de una licenciatura.</span></p>
   </header>
 
   <section class="contador" aria-label="Créditos acumulados" data-vista="creditos">
@@ -39,6 +43,7 @@ const habilitadas = lista.filter((e) => e.ok).length;
         <button type="button" aria-pressed="false" data-filtro="3">Nivel 3</button>
         <button type="button" aria-pressed="false" data-filtro="4">Nivel 4</button>
         <button type="button" aria-pressed="false" data-filtro="5">Nivel 5</button>
+        <button type="button" aria-pressed="false" data-filtro="trayecto">Mi licenciatura</button>
       </div>
     </div>
     <p class="resumen suave" data-resumen-electivas role="status" aria-live="polite">Hoy podés cursar <b>{habilitadas}</b> de {ELECTIVAS.length}.</p>
@@ -46,12 +51,12 @@ const habilitadas = lista.filter((e) => e.ok).length;
       <div class="tabla-cab" aria-hidden="true"><span>Electiva</span><span>Nivel</span><span>Créd.</span><span>Estado</span></div>
       <ul class="filas">
         {lista.map((e) => (
-          <li class="el" data-electiva={e.id} data-nivel={e.nivel} data-creditos={e.creditos} data-reg={e.reg.join(',')} data-aprob={e.aprob.join(',')} data-habilitada={e.ok ? 'si' : 'no'} data-estado="pendiente">
+          <li class="el" data-electiva={e.id} data-nivel={e.nivel} data-creditos={e.creditos} data-reg={e.reg.join(',')} data-aprob={e.aprob.join(',')} data-habilitada={e.ok ? 'si' : 'no'} data-estado="pendiente" data-licenciatura={e.licenciatura ?? ""} data-activa={e.licenciatura ? "no" : "si"} hidden={Boolean(e.licenciatura)}>
             <div class="el-nom">
               <h3>{e.nombre}</h3>
-              <p class="suave el-meta">{MODALIDAD[e.modalidad]}</p>
+              <p class="suave el-meta">{e.licenciatura ? `Materia nueva de licenciatura · desde ${e.desde}` : MODALIDAD[e.modalidad]}</p>
             </div>
-            <span class="el-nv">N{e.nivel}</span>
+            <span class="el-nv">{e.licenciatura ? "Lic." : `N${e.nivel}`}</span>
             <span class="cr"><b class="num">{e.creditos}</b><span class="cr-u"> cr.</span></span>
             <p class="el-est">
               {e.ok ? <span class="chip chip-hab">Habilitada</span> : <span class="chip" data-estado="pendiente">Bloqueada</span>}
@@ -63,7 +68,7 @@ const habilitadas = lista.filter((e) => e.ok).length;
               </ul>
             )}
             <label class="sel" hidden><span class="sr-only">Estado de {e.nombre}</span>
-              <select data-campo="estado"><option value="pendiente">Pendiente</option><option value="cursando">Cursando</option><option value="aprobada">Aprobada</option></select>
+              <select data-campo="estado">{ESTADOS_ELECTIVAS.map((estado) => <option value={estado}>{ETIQUETA[estado]}</option>)}</select>
             </label>
           </li>
         ))}
@@ -79,6 +84,7 @@ const habilitadas = lista.filter((e) => e.ok).length;
 </script>
 
 <style is:global>
+  .trayecto-enlace { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4); }
   .contador { display: grid; gap: var(--s-4); }
   @media (min-width: 761px) { .contador { grid-template-columns: 1fr 1fr; } .contador > p { grid-column: 1 / -1; } }
   .cred-t { font-size: var(--t-s); font-weight: 700; color: var(--suave); text-transform: uppercase; letter-spacing: .06em; }
@@ -109,6 +115,9 @@ const habilitadas = lista.filter((e) => e.ok).length;
   .el[data-habilitada='si'][data-estado='pendiente'] { border-left-color: var(--acento); background: linear-gradient(90deg, var(--acento-suave), transparent 55%); }
   .el[data-estado='aprobada'] { border-left-color: var(--e-aprobada); }
   .el[data-estado='cursando'] { border-left-color: var(--e-cursando); }
+  .el:is([data-estado='regular'], [data-estado='recursando'], [data-estado='promocion']) { border-left-color: var(--e-regular); }
+  .el-est { min-width:0; } .el-est .chip { white-space:normal; }
+  .el[data-licenciatura]:not([data-licenciatura='']) { background:var(--acento2-suave); }
   .el-nom { grid-area: nom; min-width: 0; }
   .el h3 { font-size: var(--t-s); line-height: 1.3; font-weight: 700; }
   .el-meta { font-size: var(--t-xs); }
@@ -126,8 +135,8 @@ const habilitadas = lista.filter((e) => e.ok).length;
   .sel select { width: 100%; }
   .tabla .vacio { margin: var(--s-4); }
 
-  @media (min-width: 761px) {
-    .tabla-cab, .el { grid-template-columns: minmax(0, 1fr) 56px 76px 112px 148px; }
+  @media (min-width: 1050px) {
+    .tabla-cab, .el { grid-template-columns: minmax(0, 1fr) 56px 76px 150px 180px; }
     .tabla-cab { display: grid; gap: var(--s-3); padding: var(--s-2) var(--s-4) var(--s-2) calc(var(--s-4) + 4px); background: var(--sup2); border-bottom: 1px solid var(--borde); font-size: var(--t-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); }
     .tabla-cab span:nth-child(3) { text-align: center; }
     .el { grid-template-areas: 'nom nv cr est sel' 'falta falta falta falta falta'; padding-block: var(--s-2); }

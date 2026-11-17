@@ -138,6 +138,7 @@ const pasos = [
         <header><h2 id="h-cred">Créditos electivos</h2><a href={`${base}electivas/`}>Ver electivas</a></header>
         <div class="cred" data-creditos="ing"><p><span>Ingeniería</span><span><b class="num" data-valor>0</b>/{CREDITOS_INGENIERIA}</span></p><progress max={CREDITOS_INGENIERIA} value="0" aria-label="Créditos para Ingeniería"></progress></div>
         <div class="cred" data-creditos="analista"><p><span>Analista · 3er nivel</span><span><b class="num" data-valor>0</b>/{CREDITOS_ANALISTA}</span></p><progress max={CREDITOS_ANALISTA} value="0" aria-label="Créditos de tercer nivel para Analista"></progress></div>
+        <p class="suave"><a href={`${base}licenciaturas/`} data-trayecto-resumen>Elegir una licenciatura</a></p>
       </section>
     </div>
   </div>
@@ -154,7 +155,7 @@ const pasos = [
           </section>
         ))}
       </div>
-      <p class="suave">Propuesta automática: da por rendido lo que cursás hoy. Ajustala en el <a href={`${base}planificador/`}>Planificador</a>.</p>
+      <p class="suave">Propuesta de cursado: regularizar no equivale a aprobar el final. Configurá los resultados previstos y el intensivo de febrero en el <a href={`${base}planificador/`}>Planificador</a>.</p>
     </div>
     <div class="tres">
       <div class="card lista-c lc-cursar" data-lista="cursar">
@@ -166,8 +167,9 @@ const pasos = [
         {rendibles.length ? <ul>{rendibles.map((m) => <li data-materia={m.n}><span class="n num">{m.n}</span>{m.nombre}</li>)}</ul> : <p class="vacio">Ningún final habilitado por ahora.</p>}
       </div>
       <div class="card lista-c lc-destraba" data-lista="destraba">
-        <h3>Las que más destraban</h3>
-        <ul>{masDestraban.map(({ m, d }) => <li data-materia={m.n}><span class="n num">{m.n === 99 ? 'S' : m.n}</span><span>{m.nombre}<small>destraba {d}</small></span></li>)}</ul>
+        <h3>Materias con más dependencias</h3>
+        <p class="suave">Incluye dependencias indirectas. En la malla podés ver qué se habilita realmente al regularizar o aprobar.</p>
+        <ul>{masDestraban.map(({ m, d }) => <li data-materia={m.n}><span class="n num">{m.n === 99 ? 'S' : m.n}</span><span>{m.nombre}<small>{d} dependencias potenciales</small></span></li>)}</ul>
       </div>
     </div>
   </section>

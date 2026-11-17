@@ -3,36 +3,51 @@
 // Reglas (ESTADO-SITIO.md):
 //  - Estados: pendiente · cursando · regular · promocion · aprobada · libre · abandono (libre/abandono no satisfacen nada).
 //  - CURSAR: todas las `reg` en regular/promocion/aprobada y todas las `aprob` en aprobada (promoción NO: debe su final).
-//  - FINAL:  la materia regular o promoción + TODAS sus correlativas (reg ∪ aprob) aprobadas.
+//  - FINAL: la materia regular + las correlativas CURSADAS y APROBADAS según sus columnas
+//    del régimen 1878, Anexo I (PARA CURSAR Y RENDIR). No se exige aprobar una correlativa solo cursada.
 //  - TERMINADA / avance: solo `aprobada`.
 //    Seminario (99): 1–23 aprobadas. Proyecto Final (36): todo el plan aprobado + PPS (la PPS no se registra: se avisa).
 //  - OPCIONAL: el Seminario (99) existe en la malla pero queda fuera de totales, listas "qué puedo hacer" y del Proyecto Final.
 //  - DESTRABA: cierre transitivo sobre reg+aprob entre materias del plan (sin electivas).
-import { MATERIAS, MATERIAS_PLAN, NIVELES, ELECTIVAS } from '../data/plan.js';
+import { MATERIAS, MATERIAS_PLAN, NIVELES } from '../data/plan.js';
+import { CATALOGO_ELECTIVAS } from '../data/trayectos.js';
 
 export const porN = Object.fromEntries(MATERIAS.map((m) => [m.n, m]));
 export const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 // Ítems del planificador: materia = Nº (number); electiva = 'e:<slug del nombre>' (string, estable aunque cambie el orden).
 export const idElectiva = (e) => `e:${slug(e.nombre)}`;
-export const electivaPorId = Object.fromEntries(ELECTIVAS.map((e) => [idElectiva(e), e]));
+export const electivaPorId = Object.fromEntries(CATALOGO_ELECTIVAS.map((e) => [idElectiva(e), e]));
 export const esElectiva = (x) => typeof x === 'string' && Object.hasOwn(electivaPorId, x);
-const itemDe = (x) => porN[x] ?? electivaPorId[x];
+export const itemDe = (x) => porN[x] ?? electivaPorId[x];
 export const nombreCorto = (n) => itemDe(n)?.nombre ?? String(n);
 
 export const estadoDe = (est, n) => est?.[n]?.estado ?? 'pendiente';
 const regOk = (e) => e === 'regular' || e === 'recursando' || e === 'promocion' || e === 'aprobada';
 const aprobada = (est, n) => estadoDe(est, n) === 'aprobada';
+/** Une el estado de obligatorias y electivas sin mutar ni cambiar su almacenamiento. */
+export function conElectivas(est, elect = {}) {
+  const out = { ...est };
+  for (const [id, estado] of Object.entries(elect)) {
+    const n = id.startsWith('e:') ? id : `e:${id}`;
+    if (esElectiva(n)) out[n] = { estado: typeof estado === 'string' ? estado : estado?.estado ?? 'pendiente' };
+  }
+  return out;
+}
 
 // ---------- Cursar ----------
 /** Qué correlativas faltan de `item` ({reg, aprob}: una materia o una electiva). */
 export function faltan(est, item) {
   return {
-    reg: item.reg.filter((n) => !regOk(estadoDe(est, n))),
-    aprob: item.aprob.filter((n) => !aprobada(est, n)),
+    reg: (item?.reg ?? []).filter((n) => !regOk(estadoDe(est, n))),
+    aprob: (item?.aprob ?? []).filter((n) => !aprobada(est, n)),
   };
 }
-export const queFaltaParaCursar = (est, n) => faltan(est, porN[n]);
-export const puedeCursar = (est, n) => { const f = queFaltaParaCursar(est, n); return !f.reg.length && !f.aprob.length; };
+export const queFaltaParaCursar = (est, n) => faltan(est, itemDe(n));
+export const puedeCursar = (est, n) => {
+  const m = itemDe(n);
+  if (!m || m.correlativasConfirmadas === false) return false;
+  const f = queFaltaParaCursar(est, n); return !f.reg.length && !f.aprob.length;
+};
 /** Sin cursar (o a retomar): pendiente, libre o abandono. */
 export const sinCursar = (e) => e === 'pendiente' || e === 'libre' || e === 'abandono';
 /** Solo `aprobada` y `promocion` llevan nota. */
@@ -41,20 +56,29 @@ export const admiteNota = (e) => e === 'aprobada' || e === 'promocion';
 export const estaHabilitada = (est, n) => sinCursar(estadoDe(est, n)) && puedeCursar(est, n);
 
 // ---------- Final ----------
-/** { regular: falta regularizarla, aprobar: [n…] sin final aprobado, extra: [texto…] requisitos no registrados } */
+/** Propia regularidad, correlativas cursadas/aprobadas y requisitos externos, por separado. */
 export function queFaltaParaFinal(est, n) {
-  const m = porN[n];
+  const m = itemDe(n);
+  if (!m) return { regular: true, reg: [], aprobar: [], extra: ['Materia no identificada.'] };
+  const especial = m.finalExigeTodo || m.finalExigeTodasHasta;
   const req = m.finalExigeTodo ? MATERIAS_PLAN.filter((x) => x.n !== n).map((x) => x.n)
     : m.finalExigeTodasHasta ? MATERIAS.filter((x) => x.n <= m.finalExigeTodasHasta).map((x) => x.n)
-    : [...new Set([...m.reg, ...m.aprob])];
-  const e = estadoDe(est, n);
+    : m.aprob;
   return {
-    regular: !regOk(e),
+    regular: !regOk(estadoDe(est, n)),
+    reg: especial ? [] : m.reg.filter((x) => !regOk(estadoDe(est, x))),
     aprobar: req.filter((x) => !aprobada(est, x)),
-    extra: m.finalExigeTodo ? ['PPS (Práctica Profesional Supervisada)'] : [], // shortcut: la PPS no se registra, solo se avisa
+    extra: [
+      ...(m.finalExigeTodo ? ['PPS (Práctica Profesional Supervisada)'] : []),
+      ...(m.correlativasConfirmadas === false ? ['Correlativas de la licenciatura pendientes de confirmación; el requisito de acceso no sustituye el régimen de cada asignatura.'] : []),
+    ],
   };
 }
-export const puedeRendirFinal = (est, n) => ['regular', 'recursando', 'promocion'].includes(estadoDe(est, n)) && queFaltaParaFinal(est, n).aprobar.length === 0;
+export const puedeRendirFinal = (est, n) => {
+  if (!itemDe(n) || itemDe(n).correlativasConfirmadas === false || !['regular', 'recursando', 'promocion'].includes(estadoDe(est, n))) return false;
+  const f = queFaltaParaFinal(est, n);
+  return !f.reg.length && !f.aprobar.length;
+};
 
 // ---------- Destraba ----------
 const dependientes = {};
@@ -70,6 +94,22 @@ export function destraba(n) {
   return new Set(cacheDestraba.get(n));
 }
 
+/** Dependencias directas según la acción exigida, e indirectas solo como alcance potencial. */
+export function relacionesDe(n) {
+  const regular = MATERIAS_PLAN.filter((m) => m.reg.includes(n)).map((m) => m.n);
+  const aprobada = MATERIAS_PLAN.filter((m) => m.aprob.includes(n)).map((m) => m.n);
+  const directas = new Set([...regular, ...aprobada]);
+  return { regular, aprobada, indirectas: [...destraba(n)].filter((d) => !directas.has(d) && !porN[d]?.opcional) };
+}
+/** Habilitaciones nuevas reales al cambiar una materia; no confundir con dependencias transitivas. */
+export function impactoReal(est, n, estado = 'aprobada') {
+  const sim = aplicar(est, { [n]: estado });
+  return {
+    cursar: habilitadas(sim).filter((x) => !habilitadas(est).includes(x)),
+    finales: rendibles(sim).filter((x) => !rendibles(est).includes(x)),
+  };
+}
+
 // ---------- "Se desbloquea" (naranja): hoy no, pero sí si aprobás lo que estás cursando ----------
 /** Copia de `est` con cambios { n: 'regular'|'aprobada'|… } (la nota se conserva). */
 export function aplicar(est, cambios) {
@@ -77,9 +117,20 @@ export function aplicar(est, cambios) {
   for (const [n, estado] of Object.entries(cambios)) out[n] = { ...out[n], estado };
   return out;
 }
+export function regularizandoLoQueCursa(est, excepto) {
+  const c = {};
+  for (const [id, dato] of Object.entries(est ?? {})) {
+    const n = esElectiva(id) ? id : Number(id);
+    if (n !== excepto && itemDe(n) && dato?.estado === 'cursando') c[n] = 'regular';
+  }
+  return aplicar(est, c);
+}
 export function aprobandoLoQueCursa(est, excepto) {
   const c = {};
-  for (const m of MATERIAS) if (m.n !== excepto && estadoDe(est, m.n) === 'cursando') c[m.n] = 'aprobada';
+  for (const [id, dato] of Object.entries(est ?? {})) {
+    const n = esElectiva(id) ? id : Number(id);
+    if (n !== excepto && itemDe(n) && dato?.estado === 'cursando') c[n] = 'aprobada';
+  }
   return aplicar(est, c);
 }
 export function seDesbloquea(est, n) {
@@ -94,9 +145,10 @@ export function seDesbloquea(est, n) {
 export const habilitadas = (est) => MATERIAS_PLAN.filter((m) => estaHabilitada(est, m.n)).map((m) => m.n);
 export const rendibles = (est) => MATERIAS_PLAN.filter((m) => puedeRendirFinal(est, m.n)).map((m) => m.n);
 /** Finales rendibles, los que más destraban primero. */
-export const finalesPorImpacto = (est) => rendibles(est).map((n) => ({ n, impacto: destraba(n).size })).sort((a, b) => b.impacto - a.impacto || a.n - b.n);
+const impactoEnPlan = (n) => [...destraba(n)].filter((d) => !porN[d]?.opcional).length;
+export const finalesPorImpacto = (est) => rendibles(est).map((n) => ({ n, impacto: impactoEnPlan(n) })).sort((a, b) => b.impacto - a.impacto || a.n - b.n);
 /** Materias no aprobadas que más destraban. */
-export const masDestraban = (est, k = 4) => MATERIAS_PLAN.filter((m) => !aprobada(est, m.n)).map((m) => ({ n: m.n, impacto: destraba(m.n).size })).sort((a, b) => b.impacto - a.impacto || a.n - b.n).slice(0, k);
+export const masDestraban = (est, k = 4) => MATERIAS_PLAN.filter((m) => !aprobada(est, m.n)).map((m) => ({ n: m.n, impacto: impactoEnPlan(m.n) })).sort((a, b) => b.impacto - a.impacto || a.n - b.n).slice(0, k);
 
 export function analizarMateria(est, n) {
   return {
@@ -114,25 +166,29 @@ const lista = (ns) => ns.map(nombreCorto).join(', ');
 export function veredicto(est, n) {
   const e = estadoDe(est, n);
   const sd = seDesbloquea(est, n);
+  const regularizando = regularizandoLoQueCursa(est, n);
+  const alRegularizar = { cursar: estaHabilitada(regularizando, n), final: puedeRendirFinal(regularizando, n) };
   if (e === 'aprobada') return { texto: 'Ya la aprobaste.', tono: 'ok' };
-  if (e === 'regular' || e === 'recursando') {
+  if (e === 'regular' || e === 'recursando' || e === 'promocion') {
     const f = queFaltaParaFinal(est, n);
-    if (!f.aprobar.length) return { texto: (e === 'recursando' ? 'Está regular: podés rendir el final.' : 'Podés rendir el final.') + (f.extra.length ? ` Recordá: ${f.extra.join(', ')}.` : ''), tono: 'ok' };
-    return { texto: `${e === 'recursando' ? 'Regular (la estás recursando)' : 'Regular'}, pero para rendir el final te falta aprobar: ${lista(f.aprobar)}.` + (sd.final ? ' Se te habilita si aprobás lo que cursás.' : ''), tono: sd.final ? 'espera' : 'falta' };
-  }
-  if (e === 'promocion') {
-    const f = queFaltaParaFinal(est, n);
-    if (!f.aprobar.length) return { texto: 'Promocionaste: rendí tu final reducido para terminarla.', tono: 'ok' };
-    return { texto: `Promocionaste, pero para rendir el final te falta aprobar: ${lista(f.aprobar)}.` + (sd.final ? ' Se te habilita si aprobás lo que cursás.' : ''), tono: sd.final ? 'espera' : 'falta' };
+    if (puedeRendirFinal(est, n)) return {
+      texto: (e === 'promocion' ? 'Promocionaste: rendí tu final reducido para terminarla.' : e === 'recursando' ? 'Está regular: podés rendir el final.' : 'Podés rendir el final.') + (f.extra.length ? ` Recordá: ${f.extra.join(', ')}.` : ''), tono: 'ok',
+    };
+    const requisitos = [];
+    if (f.reg.length) requisitos.push(`tener regulares ${lista(f.reg)}`);
+    if (f.aprobar.length) requisitos.push(`aprobar ${lista(f.aprobar)}`);
+    if (f.extra.length) requisitos.push(...f.extra);
+    return { texto: `${e === 'promocion' ? 'Promocionaste' : 'Está regular'}, pero para rendir el final falta: ${requisitos.join(' y ')}.` + (sd.final ? (alRegularizar.final ? ' Se habilita si regularizás lo que cursás; no hace falta aprobar esos finales.' : ' Se habilita si aprobás los finales de las correlativas que lo exigen.') : ''), tono: sd.final ? 'espera' : 'falta' };
   }
   if (e === 'cursando') return { texto: 'La estás cursando.', tono: 'espera' };
   const previo = e === 'libre' ? 'Quedaste libre. ' : e === 'abandono' ? 'La dejaste. ' : '';
   const f = queFaltaParaCursar(est, n);
+  if (itemDe(n)?.correlativasConfirmadas === false) return { texto: 'Para acceder a la licenciatura se exige Diseño de Sistemas regular o aprobada. Las correlativas de esta asignatura todavía deben confirmarse; no se informa como habilitada.', tono: 'espera' };
   if (!f.reg.length && !f.aprob.length) return { texto: previo + (previo ? 'Podés cursarla de nuevo.' : 'Podés cursarla.'), tono: 'ok' };
   const partes = [];
   if (f.reg.length) partes.push(`regularizar ${lista(f.reg)}`);
   if (f.aprob.length) partes.push(`aprobar ${lista(f.aprob)}`);
-  return { texto: previo + `Todavía no podés cursarla: te falta ${partes.join(' y ')}.` + (sd.cursar ? ' Se te habilita si aprobás lo que cursás.' : ''), tono: sd.cursar ? 'espera' : 'falta' };
+  return { texto: previo + `Todavía no podés cursarla: te falta ${partes.join(' y ')}.` + (sd.cursar ? (alRegularizar.cursar ? ' Se habilita si regularizás lo que cursás; no hace falta aprobar esos finales.' : ' Se habilita si aprobás los finales de las correlativas que lo exigen.') : ''), tono: sd.cursar ? 'espera' : 'falta' };
 }
 
 // ---------- Resumen / créditos ----------
@@ -184,9 +240,15 @@ export function resumenPorNivel(est) {
  * `elect`: { [idElectiva]: 'aprobada'|'cursando' }. Ingeniería: cualquier crédito; Analista: solo 3er nivel.
  * `est` (opcional): si el Seminario (99) está aprobado suma sus `creditosElectivos` SOLO a Ingeniería.
  */
-export function creditos(elect, electivas, est = {}) {
+export function creditos(elect, electivas = CATALOGO_ELECTIVAS, est = {}, licenciatura = null) {
   let ing = 0; let analista = 0;
-  for (const e of electivas) if (elect?.[slug(e.nombre)] === 'aprobada') { ing += e.creditos; if (e.nivel === 3) analista += e.creditos; }
+  const contadas = new Set();
+  for (const e of electivas) {
+    const id = slug(e.nombre);
+    if (contadas.has(id) || (e.licenciatura && e.licenciatura !== licenciatura)) continue;
+    contadas.add(id);
+    if (elect?.[id] === 'aprobada') { ing += e.creditos; if (e.nivel === 3 && !e.licenciatura) analista += e.creditos; }
+  }
   for (const m of MATERIAS) if (m.creditosElectivos && aprobada(est, m.n)) ing += m.creditosElectivos;
   return { ing, analista };
 }
@@ -220,122 +282,200 @@ export function proximaMesa(examenes, fechas, est, hoy = new Date()) {
 }
 
 // ---------- Planificador ----------
-// Modelo: `plan` = { [idCuatri]: [n…] } con ids 'AAAA-1C'|'AAAA-2C' en orden (`ids`). Una materia ANUAL pendiente
-// puesta en un 1C ocupa también las horas del 2C siguiente y recién cuenta como aprobada desde el cuatrimestre después.
-// Supuesto (se avisa en la UI): lo que hoy cursás o tenés regular se rinde, y lo de cuatrimestres previos queda aprobado.
-const tipoCuatri = (id) => id.slice(-2);
-const dur = (est, n) => (itemDe(n).modalidad === 'A' && sinCursar(estadoDe(est, n)) ? 2 : 1);
-/** Modalidad legible. principal/contra: 1|2|null; soloCuatri: 1|2|null (se dicta en un único cuatrimestre). */
+// Los cursos se proyectan REGULARES por defecto. Aprobar requiere una decisión
+// explícita y cumplir el régimen de finales; una dependencia potencial no habilita por sí sola.
+const tipoCuatri = (id) => id?.split('-')[1];
+export const esVerano = (id) => tipoCuatri(id) === 'VER';
+export const nombrePeriodo = (id) => esVerano(id) ? `Intensivo de febrero ${id.slice(0, 4)}` : `${tipoCuatri(id) === '1C' ? '1º' : '2º'} cuatrimestre ${id.slice(0, 4)}`;
+const ordenPeriodo = (id) => Number(id.slice(0, 4)) * 3 + ({ VER: 0, '1C': 1, '2C': 2 }[tipoCuatri(id)] ?? 0);
+const BASICAS_VERANO = [1, 2, 3, 9, 10];
+/** Oferta posible, no confirmación de apertura. Las excepcionales se incluyen solo al declararlas. */
+export const ofertaVerano = (opciones = {}, id = '2027-VER') => {
+  const anio = id.slice(0, 4);
+  const extras = [...(opciones.veranoExtrasPorAnio?.[anio] ?? []), ...(anio === '2027' ? opciones.veranoExtras ?? [] : [])];
+  return [...new Set([...BASICAS_VERANO, ...extras.filter((n) => itemDe(n))])];
+};
+/** Modalidad legible. Las asignaturas sin información no reciben una modalidad inventada. */
 export function modalidadInfo(item) {
   const m = item?.modalidad;
   const c = { 'A': [null, null, null, 'Anual'], '1C-2C': [1, 2, null, '1º cuatri'], '2C-1C': [2, 1, null, '2º cuatri'], '1C': [1, null, 1, 'Solo 1º cuatri'], '2C': [2, null, 2, 'Solo 2º cuatri'] }[m];
-  if (!c) return { anual: false, principal: null, contra: null, soloCuatri: null, label: '' };
+  if (!c) return { anual: false, principal: null, contra: null, soloCuatri: null, label: 'Modalidad a confirmar' };
   return { anual: m === 'A', principal: c[0], contra: c[1], soloCuatri: c[2], label: c[3] };
 }
-/** ¿El ítem `n` puesto en el cuatrimestre `id` ('AAAA-1C'|'AAAA-2C') cae en su contracuatrimestre? (aviso informativo, no error) */
-export const esContracuatri = (n, id) => modalidadInfo(itemDe(n)).contra === Number(id.slice(5, 6));
-/** Orden dentro de un cuatrimestre: anuales, cuatrimestrales, electivas; cada grupo por Nº (electivas por id). */
+export const esContracuatri = (n, id) => !esVerano(id) && modalidadInfo(itemDe(n)).contra === Number(id.slice(5, 6));
 export function ordenarPlan(ns) {
   const g = (n) => (esElectiva(n) ? 2 : itemDe(n)?.modalidad === 'A' ? 0 : 1);
   return [...ns].sort((a, b) => g(a) - g(b) || (g(a) === 2 ? String(a).localeCompare(String(b)) : a - b));
 }
 const PERMITE = { A: ['1C'], '1C': ['1C'], '2C': ['2C'], '1C-2C': ['1C', '2C'], '2C-1C': ['1C', '2C'] };
-/** Copia de `est` con lo que hoy cursás o tenés regular dado por aprobado. */
+const ofrecida = (n, id, opciones = {}) => {
+  const m = itemDe(n);
+  if (!m || (m.desde && Number(id.slice(0, 4)) < m.desde)) return false;
+  return esVerano(id) ? !!opciones.incluirVerano && ofertaVerano(opciones, id).includes(n) : !!PERMITE[m.modalidad]?.includes(tipoCuatri(id));
+};
+// Las anuales de 1C terminan al finalizar 2C del mismo año. Un intensivo termina
+// en febrero: agregar VER al calendario no transforma una anual en tres períodos.
+const finCursado = (n, id) => ordenPeriodo(itemDe(n)?.modalidad === 'A' && tipoCuatri(id) === '1C' ? `${id.slice(0, 4)}-2C` : id);
+const resultadoDe = (n, opciones) => opciones.resultados?.[n] ?? opciones.resultado ?? 'regular';
+
+/** Escenario explícito de finales aprobados; no se utiliza como supuesto del plan por defecto. */
 export function asumirRendidos(est) {
   const c = {};
-  for (const m of MATERIAS) if (['regular', 'recursando', 'promocion', 'cursando'].includes(estadoDe(est, m.n))) c[m.n] = 'aprobada';
+  for (const [n, dato] of Object.entries(est ?? {})) if (['regular', 'recursando', 'promocion', 'cursando'].includes(dato?.estado)) c[n] = 'aprobada';
   return aplicar(est, c);
 }
-/** Estado proyectado: lo de cuatrimestres anteriores queda aprobado. */
-export function proyectarPrevias(est, previas) {
-  const c = {};
-  for (const n of previas) if (!aprobada(est, n)) c[n] = 'aprobada';
-  return aplicar(est, c);
+/** Proyectar un curso terminado no equivale a aprobar su final. */
+export function proyectarPrevias(est, previas, resultado = 'regular') {
+  return aplicar(est, Object.fromEntries(previas.filter((n) => !aprobada(est, n)).map((n) => [n, resultado])));
 }
-/** Estado con el que se valida el cuatrimestre `i` (el primero usa el estado real). */
-export function estadoEnCuatri(est, plan, ids, i) {
-  if (i === 0) return est;
-  const previas = [];
-  ids.slice(0, i).forEach((id, j) => { for (const n of plan[id] ?? []) if (i >= j + dur(est, n)) previas.push(n); });
-  return proyectarPrevias(asumirRendidos(est), previas);
-}
-/** Anuales pendientes que empezaron en el cuatrimestre anterior y siguen ocupando horas en el `i`. */
-export const continuan = (est, plan, ids, i) => (i > 0 ? (plan[ids[i - 1]] ?? []).filter((n) => dur(est, n) === 2) : []);
-/** Carga semanal en el planificador: `hs` de la materia; la electiva no tiene hs, se usan sus `creditos` como proxy. */
-export const hsDe = (n) => porN[n]?.hs ?? electivaPorId[n]?.creditos ?? 0;
-export const horasDe = (ns) => ns.reduce((a, n) => a + hsDe(n), 0);
-export const horasCuatri = (est, plan, ids, i) => horasDe(plan[ids[i]] ?? []) + horasDe(continuan(est, plan, ids, i));
-
-/** Avisos de una materia puesta en un cuatrimestre, validada contra `est` (ya proyectado). [] si está todo bien. */
-export function avisosMateria(est, n, real = est, recursa = false) {
-  const e = estadoDe(est, n);
-  if (e === 'aprobada') {
-    if (recursa) return []; // recursar es intencional
-    const r = estadoDe(real, n);
-    return [`${nombreCorto(n)}: ${r === 'aprobada' ? 'ya la aprobaste' : r === 'cursando' ? 'ya la estás cursando' : r === 'pendiente' ? 'ya está en un cuatrimestre anterior' : 'ya la tenés regular'}.`];
-  }
-  if (!sinCursar(e)) return []; // ya la está cursando / regularizó: no se revalidan correlativas
-  const f = faltan(est, itemDe(n));
-  const out = [];
-  if (f.reg.length) out.push(`${nombreCorto(n)}: falta regularizar ${lista(f.reg)}.`);
-  if (f.aprob.length) out.push(`${nombreCorto(n)}: falta el final aprobado de ${lista(f.aprob)}.`);
+function aplicarFinalesPrevistos(est, candidatos) {
+  let out = est; let cambio;
+  do {
+    cambio = false;
+    for (const n of candidatos) if (puedeRendirFinal(out, n)) { out = aplicar(out, { [n]: 'aprobada' }); cambio = true; }
+  } while (cambio);
   return out;
 }
-/** Todos los avisos del cuatrimestre `i`: correlativas, modalidad, repetidas y horas. */
-export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Set()) {
+/** Estado al COMENZAR el período i, con cursos validados y resultados elegidos explícitamente. */
+export function estadoEnCuatri(est, plan, ids, i, opciones = {}) {
+  if (i <= 0 || !ids[i]) return est;
+  let proy = { ...est };
+  const activos = [];
+  const yaIniciadas = new Set();
+  const finales = new Set(opciones.finalesPrevistos ?? []);
+  for (let j = 0; j < i; j++) {
+    const id = ids[j];
+    const ns = [...(plan[id] ?? [])];
+    if (j === 0) {
+      // Lo ya cursando acaba según su modalidad; no desaparece si no se arrastró al plan.
+      for (const [n, dato] of Object.entries(est ?? {})) {
+        const clave = esElectiva(n) ? n : Number(n);
+        if (dato?.estado === 'cursando' && itemDe(clave) && !ns.includes(clave)) ns.push(clave);
+      }
+    }
+    for (const n of ns) {
+      if (!itemDe(n) || yaIniciadas.has(n)) continue;
+      const estado = estadoDe(proy, n);
+      const cursandoReal = j === 0 && estadoDe(est, n) === 'cursando';
+      const conocida = estado === 'aprobada' || regOk(estado) || cursandoReal;
+      if (!conocida && !(ofrecida(n, id, opciones) && puedeCursar(proy, n))) continue;
+      // Una modalidad inválida no puede generar aprobaciones ficticias futuras.
+      if (!cursandoReal && !ofrecida(n, id, opciones)) continue;
+      activos.push({ n, fin: finCursado(n, id), resultado: resultadoDe(n, opciones) });
+      yaIniciadas.add(n);
+    }
+    const siguiente = ordenPeriodo(ids[j + 1]);
+    for (let k = activos.length - 1; k >= 0; k--) if (activos[k].fin < siguiente) {
+      const { n, resultado } = activos[k];
+      if (!aprobada(proy, n)) proy = aplicar(proy, { [n]: 'regular' });
+      if (resultado === 'aprobada') finales.add(n);
+      activos.splice(k, 1);
+    }
+    proy = aplicarFinalesPrevistos(proy, finales);
+  }
+  return proy;
+}
+/** Anuales empezadas en 1C que siguen cursándose en 2C de ese mismo año. */
+export const continuan = (est, plan, ids, i, opciones = {}) => {
+  const id = ids[i];
+  if (!id || tipoCuatri(id) !== '2C') return [];
+  return [...new Set(ids.slice(0, i).filter((prev) => prev === `${id.slice(0, 4)}-1C`).flatMap((prev) => plan[prev] ?? []).filter((n) => itemDe(n)?.modalidad === 'A'))];
+};
+/** Créditos son solo una aproximación de carga para electivas sin horas publicadas. */
+export const hsDe = (n) => porN[n]?.hs ?? electivaPorId[n]?.hs ?? electivaPorId[n]?.creditos ?? 0;
+export const horasDe = (ns) => ns.reduce((a, n) => a + hsDe(n), 0);
+export const horasCuatri = (est, plan, ids, i, opciones = {}) => horasDe(plan[ids[i]] ?? []) + horasDe(continuan(est, plan, ids, i, opciones));
+
+export function avisosMateria(est, n, real = est, recursa = false) {
+  const m = itemDe(n);
+  if (!m) return [`${nombreCorto(n)}: materia no identificada.`];
+  const e = estadoDe(est, n);
+  if (e === 'aprobada' && !recursa) {
+    const r = estadoDe(real, n);
+    return [`${nombreCorto(n)}: ${r === 'aprobada' ? 'ya la aprobaste' : r === 'cursando' ? 'ya la estás cursando' : sinCursar(r) ? 'ya está en un período anterior' : 'ya la tenés regular'}.`];
+  }
+  if (m.correlativasConfirmadas === false) return [`${m.nombre}: correlativas y modalidad específicas a confirmar; Diseño regular o aprobado es solo el requisito de acceso a la licenciatura.`];
+  if (regOk(e) && !recursa) return [`${nombreCorto(n)}: ya la tenés regular; marcá Recursar si querés volver a cursarla.`];
+  if (!sinCursar(e) && !recursa) return []; // cursando actual
+  const f = faltan(est, m);
+  const out = [];
+  if (f.reg.length) out.push(`${nombreCorto(n)}: falta regularizar ${lista(f.reg)} para cursar (no hace falta aprobar sus finales).`);
+  if (f.aprob.length) out.push(`${nombreCorto(n)}: falta el final aprobado de ${lista(f.aprob)} para cursar.`);
+  return out;
+}
+/** Validación: las faltas de cursado y de finales se comunican por separado. */
+export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Set(), opciones = {}) {
   const id = ids[i]; const ns = plan[id] ?? [];
-  const proy = estadoEnCuatri(est, plan, ids, i);
-  // Recursar suprime solo "ya la tenés/aprobaste"; siguen correlativas, modalidad y horas.
+  const proy = estadoEnCuatri(est, plan, ids, i, opciones);
   const out = ns.flatMap((n) => avisosMateria(proy, n, est, recursar.has(n)));
   for (const n of ns) {
-    const modalidad = itemDe(n).modalidad;
-    if (sinCursar(estadoDe(est, n)) && !PERMITE[modalidad].includes(tipoCuatri(id)))
-      out.push(`${nombreCorto(n)}: se dicta ${modalidad === 'A' ? 'como anual, arrancando en el 1º cuatrimestre' : `solo en el ${tipoCuatri(id) === '1C' ? '2º' : '1º'} cuatrimestre`}.`);
-    if (ids.some((o) => o !== id && (plan[o] ?? []).includes(n))) out.push(`${nombreCorto(n)}: está repetida en otro cuatrimestre.`);
+    const m = itemDe(n); if (!m) continue;
+    if (esVerano(id)) {
+      if (!opciones.incluirVerano) out.push(`${nombreCorto(n)}: el período de verano es opcional; activalo para incluirlo en la proyección.`);
+      if (!ofertaVerano(opciones, id).includes(n)) out.push(`${nombreCorto(n)}: no pertenece a la oferta de verano prevista; solo agregarla si su intensivo fue confirmado.`);
+    } else if (sinCursar(estadoDe(est, n)) && m.modalidad && !PERMITE[m.modalidad]?.includes(tipoCuatri(id))) {
+      out.push(`${nombreCorto(n)}: se dicta ${m.modalidad === 'A' ? 'como anual, arrancando en el 1º cuatrimestre' : `solo en el ${tipoCuatri(id) === '1C' ? '2º' : '1º'} cuatrimestre`}.`);
+    }
+    if (m.desde && Number(id.slice(0, 4)) < m.desde) out.push(`${m.nombre}: implementación informada desde ${m.desde}.`);
+    if (ids.some((o) => o !== id && (plan[o] ?? []).includes(n))) out.push(`${nombreCorto(n)}: está repetida en otro período.`);
+    if (resultadoDe(n, opciones) === 'aprobada') {
+      // Comprobar el cierre real del curso: otros cursos del mismo período
+      // también pueden satisfacer requisitos antes de rendir los finales previstos.
+      const fin = finCursado(n, id);
+      const ordenSiguiente = fin + 1;
+      const anioSiguiente = Math.floor(ordenSiguiente / 3);
+      const bloqueSiguiente = ['VER', '1C', '2C'][ordenSiguiente % 3];
+      const hasta = [...ids.filter((x) => ordenPeriodo(x) <= fin), `${anioSiguiente}-${bloqueSiguiente}`];
+      const cierre = estadoEnCuatri(est, plan, hasta, hasta.length - 1, opciones);
+      const ff = queFaltaParaFinal(aplicar(cierre, { [n]: 'regular' }), n);
+      if (ff.reg.length || ff.aprobar.length || m.correlativasConfirmadas === false)
+        out.push(`${nombreCorto(n)}: el resultado «aprobada» requiere además cumplir las correlativas para rendir el final${ff.reg.length ? `; falta regularizar ${lista(ff.reg)}` : ''}${ff.aprobar.length ? `; falta aprobar ${lista(ff.aprobar)}` : ''}.`);
+    }
   }
-  const hs = horasCuatri(est, plan, ids, i);
+  if (esVerano(id)) out.push('Verano: apertura y carga del intensivo sujetas a confirmación; la carga habitual no representa las horas reales de febrero.');
+  const hs = horasCuatri(est, plan, ids, i, opciones);
   if (hs > hsLimite) out.push(`Te pasás por ${hs - hsLimite} hs del límite de ${hsLimite} hs semanales (límite provisorio).`);
   return out;
 }
-/** Notas informativas (no errores): materias puestas en su contracuatrimestre. */
 export const notasCuatri = (plan, ids, i) => (plan[ids[i]] ?? []).filter((n) => esContracuatri(n, ids[i])).map((n) => `${nombreCorto(n)}: contracuatrimestre · menos cátedras.`);
-/**
- * Propone un plan hasta recibirse. Respeta `fijo` (lo del primer cuatrimestre, p. ej. lo que cursás) y arma los demás:
- * en cada uno elige materias habilitadas (con los cuatrimestres previos aprobados), las que más destraban primero,
- * según modalidad y `hsLimite`. Determinista. Deja afuera electivas, PPS y las opcionales.
- * -> { plan, sinUbicar: [n…] } (sinUbicar = no entraron en los cuatrimestres disponibles)
- */
-export function proponerPlan(est, ids, { hsLimite = 30, fijo = [] } = {}) {
-  const plan = { [ids[0]]: [...fijo] };
-  const puestas = new Set(fijo);
-  const falta = () => MATERIAS_PLAN.filter((m) => !aprobada(est, m.n) && !puestas.has(m.n)
-    && !['regular', 'recursando', 'promocion', 'cursando'].includes(estadoDe(est, m.n)));
+/** Propuesta conservadora de cursado. Los pendientes bloqueados quedan explícitos en sinUbicar. */
+export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones } = {}) {
+  if (!ids.length) return { plan: {}, sinUbicar: MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(est, m.n))).map((m) => m.n) };
+  const plan = Object.fromEntries(ids.map((id) => [id, []]));
+  plan[ids[0]] = [...new Set(fijo.filter((n) => itemDe(n)))];
+  const puestas = new Set(plan[ids[0]]);
+  const falta = () => MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(est, m.n)) && !puestas.has(m.n));
   for (let i = 1; i < ids.length && falta().length; i++) {
-    plan[ids[i]] = [];
-    const proy = estadoEnCuatri(est, plan, ids, i);
-    let libre = hsLimite - horasDe(continuan(est, plan, ids, i));
-    const cand = falta().filter((m) => estaHabilitada(proy, m.n) && PERMITE[m.modalidad].includes(tipoCuatri(ids[i])))
+    if (esVerano(ids[i]) && !opciones.incluirVerano) continue;
+    const proy = estadoEnCuatri(est, plan, ids, i, opciones);
+    let libre = hsLimite - horasDe(continuan(est, plan, ids, i, opciones));
+    const cand = falta().filter((m) => estaHabilitada(proy, m.n) && ofrecida(m.n, ids[i], opciones)
+      && !(m.finalExigeTodo && resultadoDe(m.n, opciones) === 'aprobada' && queFaltaParaFinal(proy, m.n).aprobar.length))
       .sort((a, b) => destraba(b.n).size - destraba(a.n).size || a.n - b.n);
-    for (const m of cand) if (m.hs <= libre) { plan[ids[i]].push(m.n); puestas.add(m.n); libre -= m.hs; }
+    for (const m of cand) if (m.hs <= libre && (!esVerano(ids[i]) || plan[ids[i]].length < 1)) {
+      plan[ids[i]].push(m.n); puestas.add(m.n); libre -= m.hs;
+    }
     plan[ids[i]] = ordenarPlan(plan[ids[i]]);
   }
   return { plan, sinUbicar: falta().map((m) => m.n) };
 }
 
-/** Razón corta de por qué `n` entra en el plan (anual y/o a cuánto destraba, o que ya cumple las correlativas). */
+/** Explica qué acción pide cada dependencia directa, sin prometer habilitación automática. */
 export function razonEntrada(n) {
-  const m = itemDe(n);
-  const directas = (dependientes[n] ?? []).filter((d) => !porN[d].opcional);
+  const m = itemDe(n); if (!m) return 'Materia no identificada';
+  const relaciones = relacionesDe(n);
   const partes = [];
-  if (m.modalidad === 'A') partes.push('es anual, conviene arrancarla');
-  if (directas.length) partes.push(`destraba ${directas.slice(0, 2).map(nombreCorto).join(', ')}${directas.length > 2 ? ` (+${directas.length - 2} más)` : ''}`);
-  if (!partes.length) partes.push(m.reg.length || m.aprob.length ? 'ya tenés las correlativas' : 'no tiene correlativas');
-  const r = partes.join(' · ');
-  return r[0].toUpperCase() + r.slice(1);
+  if (m.modalidad === 'A') partes.push('cursado anual');
+  if (relaciones.regular.length) partes.push(`regularizarla es requisito para cursar ${relaciones.regular.slice(0, 2).map(nombreCorto).join(', ')}${relaciones.regular.length > 2 ? ' y otras' : ''}`);
+  if (relaciones.aprobada.length) partes.push(`aprobarla es requisito para cursar ${relaciones.aprobada.slice(0, 2).map(nombreCorto).join(', ')}${relaciones.aprobada.length > 2 ? ' y otras' : ''}`);
+  if (!partes.length) partes.push(m.reg.length || m.aprob.length ? 'requiere las correlativas indicadas para cursar' : 'sin correlativas para cursar');
+  if (relaciones.regular.length || relaciones.aprobada.length) partes.push('también deben cumplirse los demás requisitos de cada materia');
+  const r = partes.join(' · '); return r[0].toUpperCase() + r.slice(1);
 }
-/** Plan propuesto para el año que viene: [{ id, items: [{ n, electiva, razon }], hs }] (usa proponerPlan; 2026-2C queda como puente). */
-export function planProximoAnio(est, ids = ['2026-2C', '2027-1C', '2027-2C']) {
-  const { plan } = proponerPlan(est, ids);
+/** El Home conserva 1C/2C, incorporando febrero a la proyección solo si fue elegido. */
+export function planProximoAnio(est, ids = ['2026-2C', '2027-1C', '2027-2C'], opciones = {}) {
+  const timeline = opciones.incluirVerano ? [...new Set([...ids, `${ids.at(-1).slice(0, 4)}-VER`])].sort((a, b) => ordenPeriodo(a) - ordenPeriodo(b)) : ids;
+  const { plan } = proponerPlan(est, timeline, opciones);
   return ids.slice(1).map((id) => {
     const ns = plan[id] ?? [];
     return { id, hs: horasDe(ns), items: ns.map((n) => ({ n, electiva: esElectiva(n), razon: razonEntrada(n) })) };

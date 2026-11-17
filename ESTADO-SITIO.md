@@ -1,9 +1,22 @@
 # Correlativas — sitio de estudio (estado)
 
-Carpeta: `Correlativas/github/` · Fuente Astro en `fuente/` · build a `../docs` (GitHub Pages, base `/Correlativas/`).
+Carpeta: `Correlativas/github/` · Fuente Astro en `fuente/` · build a `../docs` (GitHub Pages, base `/mis_correlativas/`).
 **Publicación en GitHub: opcional/a decidir** — dejarlo listo, no publicar sin pedido de Gabi.
 
 App web interactiva de las **correlativas de Ingeniería en Sistemas de Información (Plan 2023, UTN FRC)**: reemplaza y mejora muchísimo la planilla "Mis Correlativas". Referencia de calidad aprobada: el sitio de AGA (`1º Año/AGA/github/fuente/`). Reusar su enfoque técnico (Astro estático, Layout + `global.css` con tokens en `:root`, localStorage con try/catch), **con identidad propia** y **tema claro/oscuro** (AGA sacó el oscuro; acá SÍ va).
+
+## Estado vigente — 2026-11-17
+
+Este apartado prevalece sobre los apuntes históricos que siguen. Cada cuenta empieza vacía y se sincroniza con Supabase. `ESTADO_INICIAL` es únicamente un fixture histórico de pruebas; no precargarlo en las páginas.
+
+- Correlativas verificadas en [Ordenanza 1878, Anexo I](https://www.institucional.frc.utn.edu.ar/sistemas/Download/Reglamentos/2023/1878.pdf): sus columnas **Cursadas** (`reg`) y **Aprobadas** (`aprob`) aplican **para cursar y rendir**. Para un final ordinario se exige la propia regularidad, las `reg` regulares y las `aprob` aprobadas. No exigir finales de correlativas que solo necesitan regularidad. Se conservan los requisitos especiales documentados de Seminario y Proyecto Final.
+- El panel separa dependencias directas por regularidad/aprobación, alcance indirecto y habilitaciones nuevas reales. El alcance transitivo no es una promesa de habilitación inmediata.
+- Planificación conservadora: terminar un cursado proyecta regularidad. Aprobaciones por materia y finales previstos son decisiones explícitas y se validan. Las anuales iniciadas en 1C terminan en 2C del mismo año; un intensivo termina en febrero.
+- Veranos `AAAA-VER` optativos hasta 2033. Básicas posibles: AM I/II, Álgebra, Física I/II. La oferta excepcional de Sistemas se confirma por año (`veranoExtrasPorAnio`); no trasladarla automáticamente a años futuros ni presentarla como convocatoria oficial.
+- `trayectos.js`: una elección entre Seguridad Informática, Inteligencia Artificial y Ciencia de Datos. Solo las dos primeras tienen materias nuevas anunciadas aquí. No inventar el plan de Ciencia de Datos ni las correlativas particulares todavía no publicadas.
+- Catálogo: 19 electivas habituales y 10 nuevas de Seguridad/IA. Las materias nuevas aprobadas de la licenciatura elegida suman 3 créditos según el criterio pedido por Gavi. Las compartidas con ISI no se duplican. Solo las 36 obligatorias integran el porcentaje de carrera.
+- Electivas con los ocho estados académicos. Respaldos versión 1 incorporan elección, todos los estados y opciones del plan, conservando compatibilidad con archivos anteriores e historial al cambiar trayecto.
+- Nuevas rutas/interfaces: `/licenciaturas/`, simulación de cambios y créditos sin guardar, resultados por fila y ofertas de febrero por año en el planificador.
 
 ## Preferencias de Gabi (entrevista 2026-10-27)
 - **Formato**: web app estática estilo AGA. Español rioplatense.
@@ -22,7 +35,7 @@ App web interactiva de las **correlativas de Ingeniería en Sistemas de Informac
 
 ## Reglas de correlatividad (implementar en lógica, NO hardcodear)
 - **Para CURSAR** una materia: todas sus `reg` en estado ≥ regular (regular/aprobada), y todas sus `aprob` en aprobada.
-- **Para RENDIR EL FINAL**: la materia en regular + **todas** sus correlativas (`reg` ∪ `aprob`) aprobadas.
+- **Para RENDIR EL FINAL**: la materia regular + las `reg` regulares y las `aprob` aprobadas, según Ord. 1878. Excepciones documentadas: Seminario y Proyecto Final.
 - **Seminario (99)**: el final exige materias **1 a 23** aprobadas. **Proyecto Final (36)**: el final exige **todo** el plan aprobado + PPS.
 - **"Destraba"** de una materia = materias del plan (no electivas) que dependen de ella directa o indirectamente. Calcular por cierre transitivo sobre `reg`+`aprob`.
 - **"Se desbloquea / naranja"**: materia que hoy no puede cursar/rendir pero sí podría si aprueba lo que está cursando.

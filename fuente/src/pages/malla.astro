@@ -11,6 +11,7 @@ const porNivel = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel
     <p class="eyebrow">Plan 2023 · 5 niveles</p>
     <h1>La malla</h1>
     <p class="lead">Tocá una materia para ver de qué depende, qué destraba y cambiar su estado.</p>
+    <p class="suave">Para cursar y rendir, las correlativas de «Cursadas» deben estar regulares y las de «Aprobadas» aprobadas. Para rendir necesitás además la propia materia regular. Proyecto Final tiene requisitos especiales. <a href="https://www.institucional.frc.utn.edu.ar/sistemas/Download/Reglamentos/2023/1878.pdf" target="_blank" rel="noreferrer">Ver Ordenanza 1878, Anexo I</a>.</p>
     <ul class="leyenda" aria-label="Referencias de color">
       {['pendiente', 'cursando', 'recursando', 'regular', 'promocion', 'aprobada', 'libre', 'abandono'].map((e) => <li><span class="chip" data-estado={e}>{ETIQUETA[e]}</span></li>)}
       <li><span class="hab">Habilitada para cursar</span></li>
@@ -62,7 +63,9 @@ const porNivel = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel
       <div class="listas">
         <section><h3>Para cursarla necesitás</h3><ul data-lista="requisitos"></ul></section>
         <section><h3>Para rendir el final</h3><ul data-lista="falta-final"></ul></section>
-        <section><h3>Si la aprobás, destraba</h3><ul data-lista="destraba"></ul></section>
+        <section><h3>Si la regularizás ahora</h3><ul data-lista="efecto-regular"></ul></section>
+        <section><h3>Si la aprobás ahora</h3><ul data-lista="efecto-aprobada"></ul></section>
+        <section><h3>Qué materias dependen de esta</h3><p class="suave">Las dependencias no son habilitaciones automáticas: también deben cumplirse las demás correlativas.</p><ul data-lista="destraba"></ul></section>
       </div>
     </div>
   </aside>

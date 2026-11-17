@@ -2,11 +2,12 @@
 import Layout from '../layouts/Layout.astro';
 import { MATERIAS } from '../data/plan.js';
 import { CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
-import { ETIQUETA, estadoDe, porN } from '../lib/vista.js';
+import { ETIQUETA, estadoDe } from '../lib/vista.js';
+import { nombrePeriodo, esVerano } from '../lib/motor.js';
 
 const HS_LIMITE = 30; // shortcut: umbral de sobrecarga provisorio, lo define Gabi/`web`.
 const enCurso = MATERIAS.filter((m) => estadoDe(m.n) === 'cursando');
-const nombreCuatri = (id) => `${id.slice(5, 6)}º cuatrimestre ${id.slice(0, 4)}`;
+const nombreCuatri = nombrePeriodo;
 const cuatris = CUATRIS.map((id, i) => ({ id, nombre: nombreCuatri(id), actual: i === 0, extra: i >= CUATRIS_VISIBLES, mats: i === 0 ? enCurso : [] }));
 const turnos = [
   { id: 'finales', nombre: 'Finales con fecha', filas: [] }, // las llena el JS desde `finales` de la cuenta
@@ -14,32 +15,48 @@ const turnos = [
   { id: 'jul-2027', nombre: 'Julio 2027', filas: [] },
 ];
 ---
-<Layout titulo="Planificador" descripcion="Armá cada cuatrimestre con validación de correlativas y horas, y ordená los finales por turno.">
+<Layout titulo="Planificador" descripcion="Planificá cursado, intensivos de febrero y finales con requisitos separados y resultados explícitos.">
   <header class="cab">
     <p class="eyebrow">Cursado y finales</p>
     <h1>Planificador</h1>
-    <p class="lead">Armá cada cuatrimestre y fijate si cumplís las correlativas y si te pasás de horas. Abajo, los finales por turno, priorizados por lo que destraban.</p>
+    <p class="lead">Organizá tus cursados y finales sin dar por aprobada una materia antes de tiempo. Si querés, sumá intensivos de febrero y probá qué cambia al regularizar o aprobar cada materia.</p>
   </header>
 
   <section aria-labelledby="h-cuatris" data-vista="planificador">
-    <h2 id="h-cuatris" class="sr-only">Cuatrimestres</h2>
+    <h2 id="h-cuatris" class="sr-only">Períodos de cursado</h2>
     <div class="herramientas" hidden data-herramientas>
       <button type="button" class="btn-primario" data-accion="proponer-plan">Proponer un plan</button>
-      <button type="button" data-accion="sumar-cuatri">Sumar un cuatrimestre</button>
-      <details class="ayuda"><summary>Cómo funciona</summary><p class="suave">Punto de partida, no definitivo: arma los cuatrimestres siguientes con las materias habilitadas que más destraban, respetando correlativas, modalidad y el límite de horas. Asume que aprobás lo que hoy cursás o tenés regular y lo de cada cuatrimestre anterior. No incluye la PPS. Las electivas las sumás vos a mano desde «Agregar»: validan correlativas y modalidad, y cuentan como horas semanales sus créditos. Arrastrá una materia a otro cuatrimestre para moverla.</p></details>
+      <button type="button" data-accion="sumar-cuatri">Sumar un período</button>
+      <div class="opciones-plan">
+        <label class="opcion-check"><input type="checkbox" data-incluir-verano />Incluir intensivos de febrero</label>
+        <p class="suave">Son optativos. Análisis I y II, Álgebra y Física I y II aparecen como posibilidades de verano; la oferta y las condiciones de cada año se confirman con la Facultad.</p>
+        <div class="verano-oferta" data-oferta-verano hidden>
+          <p><strong>Oferta excepcional de Sistemas</strong><br /><span class="suave">Confirmá cada oferta para un año concreto. Agregar una materia para un febrero no la habilita automáticamente en los veranos siguientes.</span></p>
+          <div class="verano-confirmar"><label>Año de la oferta<select data-verano-anio>{CUATRIS.filter(esVerano).map((id) => <option value={id.slice(0, 4)}>{id.slice(0, 4)}</option>)}</select></label><label>Materia confirmada<select data-verano-extra aria-label="Materia con oferta de verano confirmada"></select></label><button type="button" data-accion="confirmar-verano-extra">Confirmar oferta extra</button></div>
+          <ul class="ofertas-confirmadas" data-verano-extras></ul>
+        </div>
+        <fieldset class="finales-previstos">
+          <legend>Finales que planeás aprobar antes del próximo período</legend>
+          <p class="suave">Solo se proyectan los que marques y cumplan sus requisitos. Una materia regular habilita las correlativas que piden cursada; no equivale a tener el final aprobado.</p>
+          <div data-finales-previstos></div>
+        </fieldset>
+        <p class="suave">Cada cursado se proyecta como <strong>regularizado</strong>. En su fila podés elegir «Aprobar final / directa» para simular ese resultado. Esto no modifica tus estados reales.</p>
+      </div>
+      <details class="ayuda"><summary>Cómo se valida el plan</summary><p class="suave">«Regular» pide cursada aprobada; «Aprobada» pide final o aprobación directa. El plan no convierte todas tus regulares en aprobadas. Las anuales de marzo continúan en el segundo cuatrimestre, y los intensivos se completan en febrero. Las materias que no puedan ubicarse quedan indicadas para que ajustes finales, oferta y carga. Las 36 obligatorias no incluyen los créditos electivos ni la PPS. Las electivas de tu licenciatura elegida se agregan desde su catálogo y las condiciones de dictado aún no publicadas se marcan para confirmar. Arrastrá una materia o usá «Anterior» y «Siguiente» para moverla.</p></details>
       <p class="aviso" data-estado-plan role="status" aria-live="polite"></p>
     </div>
     <div class="cuatris">
       {cuatris.map((c) => {
         const hs = c.mats.reduce((a, m) => a + m.hs, 0);
         return (
-          <article class="cuatri card" style={`--i:${cuatris.indexOf(c) + 1}`} data-cuatri={c.id} data-hs-limite={HS_LIMITE} hidden={c.extra} data-extra={c.extra ? 'si' : 'no'}>
+          <article class="cuatri card" style={`--i:${cuatris.indexOf(c) + 1}`} data-cuatri={c.id} data-hs-limite={HS_LIMITE} hidden={c.extra} data-extra={c.extra ? 'si' : 'no'} data-verano={esVerano(c.id) ? 'si' : 'no'}>
             <header>
               <h3>{c.nombre}</h3>
               {c.actual && <span class="en-curso">En curso</span>}
             </header>
-            <p class="horas"><span class="num" data-hs-total>{hs}</span> <span class="suave">de {HS_LIMITE} hs semanales</span></p>
-            <progress max={HS_LIMITE} value={hs} aria-label={`Horas de ${c.nombre}`}></progress>
+            <p class="horas"><span class="num" data-hs-total>{hs}</span> <span class="suave" data-carga-label>de {HS_LIMITE} unidades de carga orientativa</span></p>
+            <progress max={HS_LIMITE} value={hs} aria-label={`Carga orientativa de ${c.nombre}`}></progress>
+            <p class="suave carga-aclaracion" data-carga-aclaracion>Las horas de obligatorias y los créditos de electivas orientan la carga; no reemplazan el horario de cursado.</p>
             {c.mats.length ? (
               <ul class="slots" data-slot-lista>
                 {c.mats.map((m) => (
@@ -59,7 +76,7 @@ const turnos = [
   </section>
 
   <section class="seccion" aria-labelledby="h-finales" data-vista="finales">
-    <header><h2 id="h-finales">Finales por turno</h2><p>Primero los que más destraban</p></header>
+    <header><h2 id="h-finales">Finales por turno</h2><p>Las fechas y la habilitación se muestran por separado</p></header>
     <div class="turnos">
       {turnos.map((t) => (
         <article class="turno card" data-turno={t.id}>
@@ -83,6 +100,29 @@ const turnos = [
 </script>
 
 <style is:global>
+  .opciones-plan { flex-basis: 100%; display: grid; gap: var(--s-3); padding-top: var(--s-2); }
+  .opciones-plan p, .carga-aclaracion { font-size: var(--t-xs); line-height: 1.5; }
+  .opcion-check, .finales-previstos label { display: flex; align-items: flex-start; gap: var(--s-2); min-height: 44px; font-size: var(--t-s); }
+  .opcion-check { font-weight: 700; align-items: center; }
+  .opcion-check input, .finales-previstos input { flex: 0 0 auto; margin-top: 4px; }
+  .finales-previstos { border: 1px solid var(--borde); padding: var(--s-3); border-radius: var(--r-s); min-width: 0; }
+  .finales-previstos legend { font-weight: 700; font-size: var(--t-s); padding: 0 var(--s-1); }
+  .finales-previstos [data-finales-previstos] { display: grid; gap: var(--s-1); margin-top: var(--s-2); }
+  .finales-previstos label span { display: grid; }
+  .finales-previstos small { font-size: var(--t-xs); color: var(--suave); }
+  .verano-confirmar { display: grid; gap: var(--s-2); align-items: end; margin-top: var(--s-2); }
+  .verano-confirmar label { display: grid; gap: var(--s-1); font-size: var(--t-xs); min-width: 0; }
+  .verano-confirmar select { min-width: 0; width: 100%; min-height: 44px; padding: 0 var(--s-2); font: inherit; color: var(--texto); background: var(--sup); border: 1px solid var(--borde-fuerte); border-radius: var(--r-s); }
+  @media (min-width: 720px) { .verano-confirmar { grid-template-columns: 7rem minmax(0, 1fr) auto; } }
+  .ofertas-confirmadas { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .ofertas-confirmadas li { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-xs); }
+  .ofertas-confirmadas button { min-height: 36px; padding: 0 var(--s-2); }
+  .resultado-plan { grid-column: 1 / -1; display: grid; gap: var(--s-1); font-size: var(--t-xs); color: var(--suave); }
+  .resultado-plan select { width: 100%; min-width: 0; min-height: 44px; font: inherit; color: var(--texto); background: var(--sup); border: 1px solid var(--borde-fuerte); border-radius: var(--r-s); padding: 0 var(--s-2); }
+  .requisitos-plan { flex-basis: 100%; line-height: 1.4; }
+  .cuatri[data-verano='si'] { border-top: 4px solid var(--acento2); }
+  .mover { display: flex; flex-direction: column; gap: 2px; }
+  .mover .paso-mover { min-height: 32px; padding: 0 var(--s-2); font-size: var(--t-xs); }
   .cuatri[hidden] { display: none; }
   /* Herramientas: barra de acciones + ayuda plegable + estado */
   .herramientas { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); margin-bottom: var(--s-4); padding: var(--s-3) var(--s-4); align-items: center; border-radius: var(--r); background: linear-gradient(120deg, var(--acento2-suave), var(--sup) 75%); border: 1px solid color-mix(in srgb, var(--azul-solido) 30%, var(--borde)); }

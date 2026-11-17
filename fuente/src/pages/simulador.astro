@@ -1,98 +1,108 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import { MATERIAS, NIVELES } from '../data/plan.js';
-import { ETIQUETA, NOMBRE_NIVEL, estadoDe } from '../lib/vista.js';
+import { MATERIAS, NIVELES, ESTADOS } from '../data/plan.js';
+import { CATALOGO_ELECTIVAS } from '../data/trayectos.js';
+import { ETIQUETA, NOMBRE_NIVEL } from '../lib/vista.js';
+import { idElectiva } from '../lib/motor.js';
 
 const ordenar = (a, b) => (a.n === 99 ? 1 : b.n === 99 ? -1 : a.n - b.n);
-const hechas = MATERIAS.filter((m) => estadoDe(m.n) === 'aprobada').sort(ordenar);
-// Se renderizan TODAS las materias: la lógica oculta las ya aprobadas según el estado guardado.
-const grupos = NIVELES.map((nv) => ({ nv, mats: MATERIAS.filter((m) => m.nivel === nv).sort(ordenar) }));
+const grupos = NIVELES.map((nv) => ({ id: `n${nv}`, nombre: NOMBRE_NIVEL[nv], materias: MATERIAS.filter((m) => m.nivel === nv).sort(ordenar).map((m) => ({ ...m, id: m.n })) }));
+grupos.push({ id: 'electivas', nombre: 'Electivas y materias de tu licenciatura', materias: CATALOGO_ELECTIVAS.map((e) => ({ ...e, id: idElectiva(e) })) });
+const etiquetaPrueba = { regular: 'Regularizar · falta final', aprobada: 'Aprobar · terminada', libre: 'Quedar libre', abandono: 'Abandonar' };
 ---
-<Layout titulo="Simulador" descripcion="Probá qué pasaría si aprobás o regularizás ciertas materias, sin tocar tu estado real.">
+<Layout titulo="Simulador" descripcion="Compará escenarios de cursado, finales y créditos sin modificar tu progreso.">
   <header class="cab">
-    <p class="eyebrow">Modo hipotético</p>
+    <p class="eyebrow">Modo hipotético · no modifica tus datos</p>
     <h1>¿Y si…?</h1>
-    <p class="lead">Marcá materias como regulares o aprobadas de prueba y mirá qué se desbloquea. Tu estado real no se toca.</p>
+    <p class="lead">Probá regularizar, aprobar o cambiar el estado de una materia. Compará qué podrías cursar, qué finales podrías rendir y cuántos créditos tendrías.</p>
   </header>
+
+  <section class="reglas-sim card" aria-label="Cómo se calculan las correlativas">
+    <p><strong>Regularizar y aprobar tienen efectos distintos.</strong> Para cursar y rendir, las correlativas de la columna “Cursadas” alcanzan con estar regulares; las de “Aprobadas” necesitan aprobación. Para rendir también necesitás tener regular la propia materia. Proyecto Final y Seminario tienen requisitos especiales.</p>
+    <a href="https://www.institucional.frc.utn.edu.ar/sistemas/Download/Reglamentos/2023/1878.pdf" target="_blank" rel="noopener noreferrer">Ver régimen oficial · Ordenanza 1878</a>
+  </section>
 
   <div class="sim" data-vista="simulador">
     <aside class="resultado card" aria-labelledby="h-res" data-sim-resultado>
-      <div class="res-cab">
-        <h2 id="h-res">Qué se desbloquea</h2>
-        <button type="button" data-accion="reset-simulacion" hidden>Volver a mi estado real</button>
-      </div>
-      <p class="suave" data-sim-resumen aria-live="polite">Todavía no marcaste nada. Elegí una materia de la lista.</p>
+      <div class="res-cab"><h2 id="h-res">Tu escenario</h2><button type="button" data-accion="reset-simulacion" hidden>Volver a mi estado real</button></div>
+      <p data-sim-resumen role="status" aria-live="polite">Elegí un estado de prueba para comparar.</p>
+      <table class="comparacion-sim" aria-label="Comparación entre tu progreso real y el escenario">
+        <thead><tr><th scope="col">Avance</th><th scope="col">Ahora</th><th scope="col">Escenario</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Aprobadas / 36</th><td data-sim-real="aprobadas">0</td><td data-sim-proy="aprobadas">0</td></tr>
+          <tr><th scope="row">Cursadas / 36 <small>Incluye aprobadas</small></th><td data-sim-real="cursadas">0</td><td data-sim-proy="cursadas">0</td></tr>
+          <tr><th scope="row">Créditos Ingeniería</th><td data-sim-real="creditos">0</td><td data-sim-proy="creditos">0</td></tr>
+          <tr><th scope="row">Créditos Analista</th><td data-sim-real="analista">0</td><td data-sim-proy="analista">0</td></tr>
+        </tbody>
+      </table>
       <div class="res-listas" hidden>
-        <section><h3>Podrías cursar</h3><ul data-sim-lista="cursar"></ul></section>
-        <section><h3>Podrías rendir el final</h3><ul data-sim-lista="finales"></ul></section>
+        <section><h3>Nuevas para cursar</h3><ul data-sim-lista="cursar"></ul></section>
+        <section><h3>Nuevos finales habilitados</h3><ul data-sim-lista="finales"></ul></section>
+        <section data-sim-perdidas hidden><h3>Dejarían de estar habilitadas</h3><ul data-sim-lista="perdidas"></ul></section>
       </div>
+      <p class="suave nota-sim">Se comparan habilitaciones inmediatas con todas las correlativas cumplidas. Que una materia dependa indirectamente de otra no significa que ya puedas cursarla.</p>
     </aside>
 
     <div class="lista">
-      <p class="sin-js">El simulador necesita JavaScript para probar materias. Activalo en tu navegador y recargá.</p>
-      {grupos.map(({ nv, mats }) => (
-        <section class="grupo" data-nivel={nv} aria-labelledby={`sim-n${nv}`} hidden={mats.every((m) => estadoDe(m.n) === 'aprobada')}>
-          <h2 id={`sim-n${nv}`}>{NOMBRE_NIVEL[nv]}</h2>
-          {mats.map((m) => {
-            const e = estadoDe(m.n);
-            const opciones = [['real', 'Como está'], ['regular', 'Regular'], ['aprobada', 'Aprobada']];
-            return (
-              <fieldset class="fila" data-sim-materia={m.n} data-estado-real={e} hidden={e === 'aprobada'}>
-                <legend class="sr-only">{m.nombre}</legend>
-                <p class="fila-info"><span class="n num">{m.n === 99 ? 'S' : m.n}</span><span class="fila-nombre">{m.nombre}</span><span class="chip" data-estado={e}>{ETIQUETA[e]}</span></p>
-                <div class="seg" data-solo-js role="radiogroup" aria-label={`Estado de prueba de ${m.nombre}`}>
-                  {opciones.map(([v, t], i) => (
-                    <label hidden={v === 'regular' && e === 'regular'}><input type="radio" name={`sim-${m.n}`} value={v} checked={i === 0} /><span>{t}</span></label>
-                  ))}
-                </div>
-              </fieldset>
-            );
-          })}
+      <p class="sin-js">El simulador necesita JavaScript para comparar con el progreso de tu cuenta.</p>
+      <div class="herramientas-sim" data-solo-js>
+        <label>Buscar materia<input type="search" data-sim-buscar placeholder="Nombre de la materia" autocomplete="off" /></label>
+        <label class="ver-aprobadas"><input type="checkbox" data-sim-ver-aprobadas /> Mostrar también aprobadas (<span data-hechas-n>0</span>)</label>
+      </div>
+      <p class="suave" data-sim-licenciatura></p>
+      {grupos.map((g) => (
+        <section class="grupo" data-sim-grupo={g.id} aria-labelledby={`sim-${g.id}`}>
+          <h2 id={`sim-${g.id}`}>{g.nombre}</h2>
+          {g.materias.map((m) => (
+            <div class="fila" data-sim-materia={m.id} data-sim-licenciatura-id={m.licenciatura || ''} data-estado-real="pendiente" hidden={Boolean(m.licenciatura)}>
+              <div class="fila-info"><span class="n num">{typeof m.id === 'number' ? m.n === 99 ? 'S' : m.n : 'E'}</span><span class="fila-nombre">{m.nombre}<small>{m.licenciatura ? `Licenciatura · ${m.creditos} créditos al aprobar · implementación prevista desde ${m.desde}` : typeof m.id === 'string' ? `${m.creditos} créditos al aprobar` : m.opcional ? 'Opcional · no cuenta en las 36' : ''}</small></span><span class="chip" data-estado="pendiente">Pendiente</span></div>
+              {m.correlativasConfirmadas === false && <p class="aviso-trayecto">Correlativas propias y oferta a confirmar. El estado de prueba permite estimar créditos, sin afirmar que la inscripción está habilitada.</p>}
+              <label class="estado-prueba" data-solo-js>Estado de prueba<span class="sr-only"> de {m.nombre}</span><select data-sim-estado><option value="real">Como está</option>{ESTADOS.map((e) => <option value={e}>{etiquetaPrueba[e] || ETIQUETA[e]}</option>)}</select></label>
+            </div>
+          ))}
         </section>
       ))}
-      <details class="hechas">
-        <summary>Ya aprobadas (<span data-hechas-n>{hechas.length}</span>)</summary>
-        <ul>{MATERIAS.slice().sort(ordenar).map((m) => <li data-materia={m.n} hidden={estadoDe(m.n) !== 'aprobada'}><span class="n num">{m.n}</span>{m.nombre}</li>)}</ul>
-      </details>
+      <p class="vacio" data-sim-sin-resultados hidden>No hay materias que coincidan con los filtros.</p>
     </div>
   </div>
 </Layout>
 
-<script>
-  import '../scripts/simulador.js';
-</script>
+<script>import '../scripts/simulador.js';</script>
 
 <style is:global>
+  .reglas-sim { margin-bottom: var(--s-6); font-size: var(--t-s); }
+  .reglas-sim p { margin-bottom: var(--s-2); }
   .sim { display: grid; gap: var(--s-6); }
-  .resultado { border-top: 4px solid var(--acento2); background: linear-gradient(170deg, var(--acento2-suave), var(--sup) 40%); }
-  @media (min-width: 900px) { .sim { grid-template-columns: 1fr 22rem; align-items: start; } .resultado { order: 2; position: sticky; top: 80px; } }
+  .resultado { border-top: 4px solid var(--acento2); background: linear-gradient(170deg, var(--acento2-suave), var(--sup) 40%); align-self: start; }
+  @media (min-width: 1050px) { .sim { grid-template-columns: minmax(0, 1fr) 25rem; align-items: start; } .resultado { order: 2; position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow: auto; } }
   .res-cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-3); align-items: center; margin-bottom: var(--s-3); }
   .res-cab h2 { font-size: var(--t-l); }
+  .comparacion-sim { width: 100%; border-collapse: collapse; margin: var(--s-4) 0; font-size: var(--t-s); table-layout: fixed; }
+  .comparacion-sim th, .comparacion-sim td { padding: var(--s-2) var(--s-1); text-align: right; border-bottom: 1px solid var(--borde); font-variant-numeric: tabular-nums; }
+  .comparacion-sim th:first-child { width: 52%; text-align: left; }
+  .comparacion-sim small { display: block; color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
+  .comparacion-sim td:last-child { color: var(--acento2); font-weight: 700; }
   .res-listas { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
   .res-listas h3 { font-size: var(--t-m); margin-bottom: var(--s-2); }
   .res-listas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
-  .res-listas li:not(.vacio) { display: flex; align-items: center; gap: var(--s-3); line-height: 1.3; font-weight: 600; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); animation: subir .35s var(--suave-ease) both; }
-  .res-listas section:first-child .n { background: var(--acento); color: var(--sobre-acento); }
-  .res-listas small { display: block; color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
+  .res-listas li:not(.vacio) { display: flex; align-items: start; gap: var(--s-3); line-height: 1.3; font-weight: 600; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); }
+  .res-listas small { display: block; margin-top: var(--s-1); color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
   .res-listas .vacio { text-align: left; }
+  .nota-sim { font-size: var(--t-xs); margin-top: var(--s-4); }
+  .herramientas-sim { display: grid; gap: var(--s-3); margin-bottom: var(--s-3); }
+  .herramientas-sim label, .estado-prueba { display: grid; gap: var(--s-1); font-size: var(--t-s); font-weight: 600; }
+  .herramientas-sim input[type='search'], .estado-prueba select { width: 100%; min-width: 0; min-height: 44px; font: inherit; color: var(--texto); background: var(--sup); border: 1px solid var(--borde-fuerte); border-radius: var(--r-s); padding: var(--s-2); }
+  .herramientas-sim .ver-aprobadas { display: flex; align-items: center; gap: var(--s-2); }
+  .ver-aprobadas input { width: 18px; height: 18px; }
+  [data-sim-licenciatura] { margin-bottom: var(--s-4); font-size: var(--t-s); }
   .grupo { margin-bottom: var(--s-8); }
   .grupo h2 { font-size: var(--t-l); padding-bottom: var(--s-3); margin-bottom: var(--s-3); border-bottom: 2px solid var(--borde); }
-  .fila { border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup); padding: var(--s-3); margin: 0 0 var(--s-2); display: grid; gap: var(--s-3); box-shadow: var(--sombra); min-width: 0; transition: border-color .2s, box-shadow .2s, transform .2s var(--suave-ease); }
-  .fila:hover, .fila:focus-within { border-color: var(--borde-fuerte); box-shadow: var(--sombra-h); }
-  @media (min-width: 640px) { .fila { grid-template-columns: 1fr auto; align-items: center; } }
+  .fila { border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup); padding: var(--s-3); margin: 0 0 var(--s-2); display: grid; gap: var(--s-3); box-shadow: var(--sombra); min-width: 0; }
+  .fila:hover, .fila:focus-within { border-color: var(--borde-fuerte); }
+  .fila[data-sim-cambiada='si'] { border-color: var(--acento2); background: var(--acento2-suave); }
   .fila-info { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2) var(--s-3); min-width: 0; }
   .fila-nombre { font-weight: 600; font-size: var(--t-s); flex: 1 1 10rem; line-height: 1.3; }
-  .seg { display: flex; border: 1px solid var(--borde-fuerte); border-radius: 999px; overflow: hidden; background: var(--sup2); }
-  .seg label { flex: 1; position: relative; }
-  .seg input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
-  .seg span { display: grid; place-items: center; min-height: 44px; padding: 0 var(--s-3); font-size: var(--t-s); font-weight: 600; color: var(--suave); white-space: nowrap; }
-  .seg span { transition: background .2s, color .2s; }
-  .seg label:hover span { background: var(--acento2-suave); color: var(--acento2); }
-  .seg input:checked + span { background: var(--azul-solido); color: var(--sobre-azul); }
-  .seg input:focus-visible + span { outline: 3px solid var(--acento); outline-offset: -3px; border-radius: 999px; }
-  .hechas { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--r-s); padding: var(--s-1) var(--s-4); }
-  .hechas summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
-  .hechas ul { list-style: none; padding: 0 0 var(--s-3); margin: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
-  .hechas li { display: flex; align-items: center; gap: var(--s-3); }
-  .hechas[open] summary { color: var(--acento); }
+  .fila-nombre small { display: block; margin-top: var(--s-1); color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
+  .aviso-trayecto { font-size: var(--t-xs); color: var(--suave); }
+  .fila[hidden], .grupo[hidden], .res-listas[hidden], [data-sim-perdidas][hidden] { display: none; }
 </style>

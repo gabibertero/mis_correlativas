@@ -52,6 +52,12 @@
 
 Reemplaza una planilla de Google por una app estática, rápida y pensada para el celular.
 
+El planificador permite agregar **intensivos de febrero** de manera optativa. Las básicas se consideran posibilidades de planificación; las ofertas excepcionales de Sistemas se confirman para un año concreto. Terminar un cursado lo proyecta como **regular**, y aprobar un final o una directa se elige expresamente. La carga de febrero queda sujeta al horario real del intensivo.
+
+En **Licenciaturas** podés elegir Seguridad Informática, Inteligencia Artificial o Ciencia de Datos. Se registran las materias nuevas anunciadas de las dos primeras; Ciencia de Datos queda pendiente de publicación. Cada materia nueva aprobada del trayecto elegido aporta 3 créditos según la configuración solicitada para este seguimiento. Las materias compartidas conservan el estado de Ingeniería y no se duplican. Las electivas admiten todos los estados académicos y solo suman créditos al aprobarse.
+
+Las correlativas respetan la [Ordenanza 1878, Anexo I](https://www.institucional.frc.utn.edu.ar/sistemas/Download/Reglamentos/2023/1878.pdf): las columnas **Cursadas** y **Aprobadas** aplican tanto al cursado como al final, además de la propia regularidad para rendir. El detalle de una materia distingue dependencias potenciales del efecto real de regularizarla o aprobarla.
+
 | | | | |
 |---|---|---|---|
 | 📊 **Dashboard** | Avance total y por nivel en 3 tonos, promedio, créditos y cuenta regresiva. | 🗺️ **Malla visual** | Todas las materias con su estado y las correlatividades resaltadas. |

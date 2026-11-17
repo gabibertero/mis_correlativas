@@ -1,7 +1,8 @@
 // Dashboard: KPIs, avance por nivel, créditos, "qué puedo hacer ahora", cuenta regresiva, exportar/importar.
-import { ELECTIVAS, CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
+import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 import * as M from '../lib/motor.js';
-import { PREFIJO, cargarEstado, cargarFechas, cargarFinales, cargarElectivas, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
+import { PREFIJO, cargarEstado, cargarFechas, cargarFinales, cargarElectivas, cargarLicenciatura, cargarOpcionesPlan, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
 import { $, $$, el, etiquetaN, filaMateria, vacio, fmtFecha } from './comun.js';
 
 const reemplazarLista = (cont, items, textoVacio) => {
@@ -54,7 +55,10 @@ function pintar() {
   }
 
   // Créditos
-  const cr = M.creditos(cargarElectivas(), ELECTIVAS, est);
+  const licenciatura = cargarLicenciatura();
+  const cr = M.creditos(cargarElectivas(), CATALOGO_ELECTIVAS, est, licenciatura);
+  const trayecto = $('[data-trayecto-resumen]');
+  if (trayecto) trayecto.textContent = LICENCIATURAS.find((l) => l.id === licenciatura)?.nombre ?? 'Sin licenciatura elegida';
   for (const [id, v] of [['ing', cr.ing], ['analista', cr.analista]]) {
     const c = $(`[data-creditos="${id}"]`);
     $('[data-valor]', c).textContent = v;
@@ -64,10 +68,10 @@ function pintar() {
   // Qué puedo hacer ahora
   reemplazarLista($('[data-lista="cursar"]'), M.habilitadas(est).map((n) => filaMateria(n)), 'Nada habilitado por ahora.');
   reemplazarLista($('[data-lista="finales"]'), rend.map((n) => filaMateria(n)), 'Ningún final habilitado por ahora.');
-  reemplazarLista($('[data-lista="destraba"]'), M.masDestraban(est).map(({ n, impacto }) => filaMateria(n, `destraba ${impacto}`)), 'Todo aprobado.');
+  reemplazarLista($('[data-lista="destraba"]'), M.masDestraban(est).map(({ n, impacto }) => filaMateria(n, `${impacto} dependencias potenciales · revisá si exigen regularidad o aprobación en la malla`)), 'Todo aprobado.');
 
   // Plan 2027 con el porqué
-  for (const c of M.planProximoAnio(est)) {
+  for (const c of M.planProximoAnio(est, undefined, cargarOpcionesPlan())) {
     const sec = $(`[data-cuatri-plan="${c.id}"]`); if (!sec) continue;
     $('[data-hs]', sec).textContent = `${c.hs} hs`;
     reemplazarLista(sec, c.items.map((it) => el('li', { dataset: { materia: it.n, electiva: it.electiva ? 'si' : 'no' } },
@@ -94,7 +98,7 @@ function pintar() {
 pintar();
 // Al volver atrás el navegador puede restaurar el DOM anterior sin ejecutar de nuevo el script.
 addEventListener('pageshow', (ev) => { if (ev.persisted) pintar(); });
-const clavesResumen = new Set(['estado', 'electivas', 'finales', 'fechas'].map((c) => PREFIJO + c));
+const clavesResumen = new Set(['estado', 'electivas', 'finales', 'fechas', 'licenciatura', 'opcionesPlan'].map((c) => PREFIJO + c));
 addEventListener('storage', (ev) => { if (ev.key === null || clavesResumen.has(ev.key)) pintar(); });
 
 // Exportar / importar

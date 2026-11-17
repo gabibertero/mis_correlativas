@@ -2,10 +2,13 @@
 // Fuente: régimen de correlativas oficial (sistemas.pdf, CET AETI / Consejeros de Sistemas).
 // Verificado contra la planilla "Mis Correlativas" el 2026-10-27: coincide al 100%.
 //
-// Correlativas: `reg` = materias que deben estar REGULARES para CURSAR esta;
-//               `aprob` = materias con FINAL APROBADO para CURSAR esta.
-// Para RENDIR EL FINAL de una materia: tenerla regular + TODAS sus correlativas (reg y aprob)
-//   con final aprobado. (El "destraba" y los habilitados se calculan en la lógica, no acá.)
+// Ord. 1878, Anexo I: columnas «PARA CURSAR Y RENDIR».
+// https://www.institucional.frc.utn.edu.ar/sistemas/Download/Reglamentos/2023/1878.pdf
+// Correlativas: `reg` = materias que deben estar REGULARES (cursadas);
+//               `aprob` = materias con FINAL APROBADO.
+// Para rendir un final ordinario se mantienen esas mismas condiciones, además
+// de tener regularizada la propia materia. Proyecto Final tiene una excepción
+// expresa: todas las asignaturas previas aprobadas.
 // Modalidad: 'A' anual · '1C-2C' se dicta 1º y 2º cuatrimestre · '2C-1C' ídem, orden sugerido.
 
 export const MATERIAS = [
