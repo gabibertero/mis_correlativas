@@ -149,6 +149,52 @@ const impactoEnPlan = (n) => [...destraba(n)].filter((d) => !porN[d]?.opcional).
 export const finalesPorImpacto = (est) => rendibles(est).map((n) => ({ n, impacto: impactoEnPlan(n) })).sort((a, b) => b.impacto - a.impacto || a.n - b.n);
 /** Materias no aprobadas que más destraban. */
 export const masDestraban = (est, k = 4) => MATERIAS_PLAN.filter((m) => !aprobada(est, m.n)).map((m) => ({ n: m.n, impacto: impactoEnPlan(m.n) })).sort((a, b) => b.impacto - a.impacto || a.n - b.n).slice(0, k);
+/** Nºs ordenados por nivel y luego por Nº (para listas del Inicio). */
+export const ordenarPorNivel = (ns) => [...ns].sort((a, b) => (itemDe(a)?.nivel ?? 9) - (itemDe(b)?.nivel ?? 9) || a - b);
+
+const PROYECTO_FINAL = MATERIAS_PLAN.find((m) => m.finalExigeTodo)?.n;
+/**
+ * Materias del plan (sin opcionales, sin aprobadas) que hoy no se pueden cursar o rendir por deber el final de `n`.
+ * Arranca por las que piden `n` APROBADA (las que solo la piden regular ya no están trabadas: ya la tenés regular)
+ * y sigue la cadena con la misma regla: de una trabada que ya está regular solo siguen trabadas las que la piden
+ * aprobada (igual si ya la está cursando); de una sin cursar, todas sus dependientes. Proyecto Final (exige todo aprobado) se cuenta solo si
+ * pide `n` aprobada en forma directa. -> { directas: [Nº], todas: [Nº] }
+ */
+function trabaPorFinal(est, n) {
+  const cuenta = (x) => { const m = porN[x]; return m && !m.opcional && !aprobada(est, x); };
+  const directas = MATERIAS_PLAN.filter((m) => m.aprob.includes(n) && cuenta(m.n)).map((m) => m.n);
+  const todas = new Set(directas); const cola = [...directas];
+  while (cola.length) {
+    const d = cola.pop();
+    // Si ya la cursa o la tiene regular, el final adeudado solo frena a las que la piden aprobada.
+    const soloAprob = regOk(estadoDe(est, d)) || estadoDe(est, d) === 'cursando';
+    for (const m of MATERIAS_PLAN) {
+      if (todas.has(m.n) || m.n === PROYECTO_FINAL || !cuenta(m.n)) continue;
+      if (m.aprob.includes(d) || (!soloAprob && m.reg.includes(d))) { todas.add(m.n); cola.push(m.n); }
+    }
+  }
+  return { directas, todas: [...todas].sort((a, b) => a - b) };
+}
+/**
+ * Orden recomendado para rendir los finales que debés (regular · recursando · promoción; sin el Seminario opcional):
+ * primero los que más materias te traban a futuro. Desempates: más materias que piden ese final en forma directa,
+ * rendible hoy, nivel más bajo, Nº.
+ * -> [{ n, posicion, traba, trabaDirectas, trabadas, directas, rendible, falta: null | { regularizar, aprobar, extra } }]
+ */
+export function recomendacionFinales(est) {
+  return MATERIAS_PLAN.filter((m) => ['regular', 'recursando', 'promocion'].includes(estadoDe(est, m.n)))
+    .map((m) => {
+      const t = trabaPorFinal(est, m.n);
+      const rendible = puedeRendirFinal(est, m.n);
+      const f = queFaltaParaFinal(est, m.n);
+      return {
+        n: m.n, nivel: m.nivel, traba: t.todas.length, trabaDirectas: t.directas.length, trabadas: t.todas, directas: t.directas,
+        rendible, falta: rendible ? null : { regularizar: f.reg, aprobar: f.aprobar, extra: f.extra },
+      };
+    })
+    .sort((a, b) => b.traba - a.traba || b.trabaDirectas - a.trabaDirectas || Number(b.rendible) - Number(a.rendible) || a.nivel - b.nivel || a.n - b.n)
+    .map(({ nivel, ...r }, i) => ({ ...r, posicion: i + 1 }));
+}
 
 export function analizarMateria(est, n) {
   return {
