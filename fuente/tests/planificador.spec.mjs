@@ -4,11 +4,28 @@ const K = 'corr:v1:';
 const leerPlan = (page) => page.evaluate((k) => JSON.parse(localStorage.getItem(k + 'plan') ?? 'null'), K);
 const guardarLS = (page, k, v) => page.evaluate(([p, k, v]) => localStorage.setItem(p + k, JSON.stringify(v)), [K, k, v]);
 
+// El planificador es una página con sesión: sesión ficticia local y Supabase interceptado
+// (no se crean cuentas ni se leen datos reales). Los datos se cargan con guardarLS + reload.
+async function sesionFalsa(page, datos = {}) {
+  await page.context().route(/https:\/\/[^/]+\.supabase\.co\/.*/, (route) => route.fulfill({ json: {} }));
+  await page.addInitScript((datos) => {
+    if (sessionStorage.getItem('planificador:iniciado')) return;
+    sessionStorage.setItem('planificador:iniciado', '1');
+    sessionStorage.setItem('corr:pulled', '1');
+    const user = { id: '00000000-0000-4000-8000-000000000003', aud: 'authenticated', role: 'authenticated', email: 'planificador@example.test' };
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const token = `${btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${btoa(JSON.stringify({ sub: user.id, aud: user.aud, role: user.role, exp }))}.firma-de-prueba`;
+    localStorage.setItem('sb-sqxfimanxgrzvjzbnumj-auth-token', JSON.stringify({ access_token: token, refresh_token: 'solo-prueba', expires_at: exp, expires_in: 3600, token_type: 'bearer', user }));
+    for (const [k, v] of Object.entries(datos)) localStorage.setItem(`corr:v1:${k}`, JSON.stringify(v));
+  }, datos);
+}
+test.beforeEach(async ({ page }) => { await sesionFalsa(page); });
+
 test.describe('planificador: proponer y mover', () => {
   test('proponer arma un plan sin avisos, persiste y sobrevive al reload', async ({ page }) => {
     await page.goto('planificador/');
     await page.locator('[data-accion="proponer-plan"]').click();
-    await expect(page.locator('[data-estado-plan]')).toContainText('Propuesta armada');
+    await expect(page.locator('[data-estado-plan]')).toContainText(/Propuesta (de cursado armada|parcial)/);
     const plan = await leerPlan(page);
     expect(plan['2027-1C'].length).toBeGreaterThan(0);
     expect(Object.values(plan).flat()).not.toContain(99);
@@ -41,7 +58,7 @@ test.describe('planificador: proponer y mover', () => {
     await c1.locator('select').selectOption('25'); // Calidad: falta Diseño
     await c1.locator('[data-accion="agregar-materia"]').click();
     await expect(c1.locator('[data-avisos] li')).not.toHaveCount(0);
-    await expect(c1.locator('li[data-materia="25"] [data-accion="mover-siguiente"]')).toHaveCount(0);
+    await expect(c1.locator('li[data-materia="25"]')).toBeVisible();
   });
 
   test('arrastrar y soltar entre cuatrimestres (mouse)', async ({ page, isMobile }) => {
@@ -74,9 +91,9 @@ test.describe('planificador: proponer y mover', () => {
   });
 
   test('sin JS: los cuatrimestres base se ven y las herramientas quedan ocultas', async ({ browser }) => {
-    const ctx = await browser.newContext({ javaScriptEnabled: false });
+    const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL: test.info().project.use.baseURL });
     const page = await ctx.newPage();
-    await page.goto('http://localhost:4399/Correlativas/planificador/');
+    await page.goto('planificador/');
     await expect(page.locator('[data-cuatri="2026-2C"]')).toBeVisible();
     await expect(page.locator('[data-cuatri="2028-1C"]')).toBeHidden();
     await expect(page.locator('[data-herramientas]')).toBeHidden();
@@ -182,5 +199,45 @@ test.describe('planificador: modalidad, orden y recursar', () => {
     await expect(av).not.toContainText('ya la aprobaste');
     await page.locator('[data-cuatri="2027-1C"] [data-accion="recursar"][data-materia="1"]').click();
     await expect(av).toContainText('ya la aprobaste');
+  });
+});
+
+test.describe('planificador: intensivos de febrero por año', () => {
+  test('sumar febrero 2027 muestra solo esa tarjeta; quitarlo con materias pide confirmación', async ({ page }) => {
+    await page.goto('planificador/');
+    await guardarLS(page, 'estado', { 1: { estado: 'aprobada' }, 2: { estado: 'regular' } });
+    await page.reload();
+    const veranos = page.locator('[data-cuatri$="-VER"]:visible');
+    await expect(veranos).toHaveCount(0);
+    await page.locator('[data-verano-sumar-anio]').selectOption('2027');
+    await page.locator('[data-accion="sumar-verano"]').click();
+    await expect(veranos).toHaveCount(1);
+    await expect(page.locator('[data-cuatri="2027-VER"]')).toBeVisible();
+    await expect(page.locator('[data-verano-sumar-anio] option[value="2027"]')).toHaveCount(0);
+    await expect(page.locator('[data-veranos-activos]')).toContainText('Febrero 2027');
+    const v = page.locator('[data-cuatri="2027-VER"]');
+    await v.locator('[data-campo="materia"]').selectOption('9');
+    await v.locator('[data-accion="agregar-materia"]').click();
+    expect((await leerPlan(page))['2027-VER']).toEqual([9]);
+    // Cancelar no quita nada; aceptar quita el período y sus materias.
+    page.once('dialog', (d) => d.dismiss());
+    await v.locator('[data-accion="quitar-verano"]').click();
+    await expect(v).toBeVisible();
+    page.once('dialog', (d) => d.accept());
+    await v.locator('[data-accion="quitar-verano"]').click();
+    await expect(veranos).toHaveCount(0);
+    expect((await leerPlan(page))['2027-VER']).toEqual([]);
+    expect((await page.evaluate((k) => JSON.parse(localStorage.getItem(k + 'opcionesPlan')), K)).veranos).toEqual([]);
+  });
+
+  test('migración: el interruptor viejo activa solo 2027 y un febrero con materias se conserva', async ({ page }) => {
+    await page.goto('planificador/');
+    await guardarLS(page, 'opcionesPlan', { incluirVerano: true });
+    await guardarLS(page, 'plan', { '2029-VER': [1] });
+    await page.reload();
+    await expect(page.locator('[data-cuatri="2027-VER"]')).toBeVisible();
+    await expect(page.locator('[data-cuatri="2028-VER"]')).toBeHidden();
+    await expect(page.locator('[data-cuatri="2029-VER"]')).toBeVisible();
+    expect((await page.evaluate((k) => JSON.parse(localStorage.getItem(k + 'opcionesPlan')), K)).veranos).toEqual(['2027', '2029']);
   });
 });

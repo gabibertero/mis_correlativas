@@ -19,13 +19,16 @@ const creditosPlanificados = (ns) => [...new Set(ns)].filter((n) => M.esElectiva
   .reduce((a, e) => a + e.creditos, 0);
 const opciones = cargarOpcionesPlan();
 opciones.veranoExtrasPorAnio ??= {};
-let veranoAnio = CUATRIS.find(M.esVerano)?.slice(0, 4) ?? '2027';
+const ANIOS_VERANO = CUATRIS.filter(M.esVerano).map((id) => id.slice(0, 4));
 const extrasDeAnio = (anio) => [...new Set([...(opciones.veranoExtrasPorAnio[anio] ?? []), ...(String(anio) === '2027' ? opciones.veranoExtras : [])])];
 const fechas = cargarFechas();
 const clave = (v) => (/^\d+$/.test(v) ? Number(v) : v);
 const actuales = [...MATERIAS.map((m) => m.n), ...catalogo.map(M.idElectiva)].filter((n) => M.estadoDe(est, n) === 'cursando');
 const plan = cargarPlan() ?? { [CUATRIS[0]]: actuales };
 for (const id of CUATRIS) plan[id] ??= [];
+// Migración: un febrero con materias guardadas queda sumado aunque venga del interruptor viejo.
+const conMaterias = CUATRIS.filter((id) => M.esVerano(id) && plan[id].length).map((id) => id.slice(0, 4)).filter((a) => !opciones.veranos.includes(a));
+if (conMaterias.length) { opciones.veranos = [...opciones.veranos, ...conMaterias].sort(); guardarOpcionesPlan(opciones); }
 const recursar = new Set(cargarRecursar());
 const guardarMarcas = () => {
   for (const n of [...recursar]) if (!Object.values(plan).some((ns) => ns.includes(n))) recursar.delete(n);
@@ -36,7 +39,7 @@ const arts = $$('[data-cuatri]');
 const ids = arts.map((a) => a.dataset.cuatri);
 const nombreDe = (id) => M.nombrePeriodo(id);
 const itemDe = (n) => M.porN[n] ?? M.electivaPorId[n];
-const periodosActivos = () => ids.filter((id) => !M.esVerano(id) || opciones.incluirVerano || plan[id].length);
+const periodosActivos = () => ids.filter((id) => !M.esVerano(id) || M.veranoActivo(opciones, id) || plan[id].length);
 let visibles = CUATRIS_VISIBLES;
 const decir = (t) => { const a = $('[data-estado-plan]'); if (a) a.textContent = t; };
 const guardarOpciones = () => guardarOpcionesPlan(opciones);
@@ -78,14 +81,28 @@ function filaMateriaPlan(n, i) {
     el('label', { class: 'resultado-plan' }, 'Resultado previsto al terminar el cursado', resultadoSelect));
 }
 
+const BASICAS_VERANO = new Set(M.ofertaVerano({}));
+function pintarVeranos() {
+  const libres = ANIOS_VERANO.filter((a) => !opciones.veranos.includes(a));
+  const sel = $('[data-verano-sumar-anio]');
+  sel.replaceChildren(...(libres.length ? libres.map((a) => el('option', { value: a }, `Febrero ${a}`)) : [el('option', { value: '' }, 'Ya sumaste todos')]));
+  sel.disabled = !libres.length; $('[data-accion="sumar-verano"]').disabled = !libres.length;
+  $('[data-veranos-activos]').replaceChildren(...opciones.veranos.map((a) => el('li', {}, `Febrero ${a}`,
+    el('button', { type: 'button', dataset: { quitarVerano: a }, 'aria-label': `Quitar intensivo de febrero ${a}` }, 'Quitar'))));
+  for (const art of arts.filter((a) => a.dataset.verano === 'si')) {
+    const anio = art.dataset.cuatri.slice(0, 4);
+    const activo = M.veranoActivo(opciones, art.dataset.cuatri);
+    $('[data-accion="quitar-verano"]', art).hidden = !activo;
+    $('[data-accion="quitar-verano"]', art).setAttribute('aria-label', `Quitar intensivo de febrero ${anio}`);
+    $('[data-oferta-verano]', art).hidden = !activo;
+    $('[data-verano-extra]', art).replaceChildren(el('option', { value: '' }, 'Elegí una materia…'), ...MATERIAS.filter((m) => !m.opcional && !BASICAS_VERANO.has(m.n) && !extrasDeAnio(anio).includes(m.n)).map((m) => el('option', { value: m.n }, m.nombre)));
+    $('[data-verano-extras]', art).replaceChildren(...extrasDeAnio(anio).map((n) => el('li', {}, M.nombreCorto(n),
+      el('button', { type: 'button', dataset: { accion: 'quitar-oferta', materia: n }, 'aria-label': `Quitar oferta de febrero ${anio} de ${M.nombreCorto(n)}` }, 'Quitar'))));
+  }
+}
+
 function pintarOpciones() {
-  $('[data-incluir-verano]').checked = opciones.incluirVerano;
-  $('[data-oferta-verano]').hidden = !opciones.incluirVerano;
-  $('[data-verano-anio]').value = veranoAnio;
-  const basicas = new Set([1, 2, 3, 9, 10]);
-  $('[data-verano-extra]').replaceChildren(el('option', { value: '' }, 'Elegí una oferta excepcional…'), ...MATERIAS.filter((m) => !m.opcional && !basicas.has(m.n) && !extrasDeAnio(veranoAnio).includes(m.n)).map((m) => el('option', { value: m.n }, m.nombre)));
-  const anios = [...new Set([...Object.keys(opciones.veranoExtrasPorAnio), ...(opciones.veranoExtras.length ? ['2027'] : [])])].sort();
-  $('[data-verano-extras]').replaceChildren(...anios.flatMap((anio) => extrasDeAnio(anio).map((n) => el('li', {}, `${anio} · ${M.nombreCorto(n)}`, el('button', { type: 'button', dataset: { quitarOferta: n, anio }, 'aria-label': `Quitar oferta de febrero ${anio} de ${M.nombreCorto(n)}` }, 'Quitar')))));
+  pintarVeranos();
   const finales = [...MATERIAS.map((m) => m.n), ...catalogo.map(M.idElectiva)].filter((n) => ['regular', 'recursando', 'promocion'].includes(M.estadoDe(est, n)));
   $('[data-finales-previstos]').replaceChildren(...(finales.length ? finales.map((n) => {
     const input = el('input', { type: 'checkbox', value: n, dataset: { finalPrevisto: '' } });
@@ -97,7 +114,10 @@ function pintarOpciones() {
 function pintarCuatris() {
   const activos = periodosActivos();
   const ultimo = activos.findLastIndex((id) => plan[id].length);
-  visibles = Math.min(activos.length, Math.max(visibles, CUATRIS_VISIBLES, ultimo + 1));
+  // Siempre a la vista: los CUATRIS_VISIBLES primeros cuatrimestres comunes y todo febrero sumado.
+  const base = activos.indexOf(ids.filter((id) => !M.esVerano(id))[CUATRIS_VISIBLES - 1]) + 1;
+  const ultimoVerano = activos.findLastIndex((id) => M.esVerano(id));
+  visibles = Math.min(activos.length, Math.max(visibles, base, ultimo + 1, ultimoVerano + 1));
   const usadas = new Set(Object.values(plan).flat());
   arts.forEach((art, i) => {
     const id = ids[i]; const ns = plan[id]; const verano = M.esVerano(id);
@@ -112,7 +132,7 @@ function pintarCuatris() {
     const hs = M.horasCuatri(est, plan, ids, i, opciones);
     const limite = Number(art.dataset.hsLimite);
     $('[data-hs-total]', art).textContent = verano ? ns.length : hs;
-    $('[data-carga-label]', art).textContent = verano ? 'materias intensivas en febrero' : `de ${limite} unidades de carga orientativa`;
+    $('[data-carga-label]', art).textContent = verano ? (ns.length === 1 ? 'materia intensiva en febrero' : 'materias intensivas en febrero') : `de ${limite} unidades de carga orientativa`;
     $('[data-carga-aclaracion]', art).textContent = verano ? 'La carga y la oferta de febrero se confirman cada año. No equivale a las horas semanales del cursado normal.' : 'Obligatorias: horas semanales de referencia. Electivas: créditos como orientación de carga, no horas reales.';
     $('progress', art).hidden = verano;
     $('progress', art).value = hs;
@@ -122,7 +142,6 @@ function pintarCuatris() {
     crP.hidden = !crPeriodo;
     crP.textContent = crPeriodo ? `+${crPeriodo} créditos electivos en este período, si aprobás sus electivas.` : '';
     const avisos = M.avisosCuatri(est, plan, ids, i, limite, recursar, opciones);
-    if (verano && !opciones.incluirVerano && ns.length) avisos.unshift('Tenés un intensivo guardado; activá verano para incluirlo en nuevas propuestas o quitá sus materias.');
     if (ns.some((n) => itemDe(n).licenciatura && itemDe(n).licenciatura !== licenciatura)) avisos.push('Este período conserva materias de una licenciatura que no está elegida; no suman créditos al trayecto actual.');
     const ul = $('[data-avisos]', art); ul.setAttribute('role', 'status');
     ul.replaceChildren(...avisos.map((t) => el('li', {}, t)));
@@ -137,7 +156,7 @@ function pintarCuatris() {
       : el('optgroup', { label: `${licElegida.nombre} · suman créditos` }, ...(deLic.length ? deLic.map(opcionElectiva) : [el('option', { value: '', disabled: true }, licElegida.materias.length ? 'Ya están todas en tu plan o no se dictan este año' : 'Sin materias publicadas todavía')]));
     const recursables = [...MATERIAS.map((m) => m.n), ...catalogo.map(M.idElectiva)].filter((n) => !usadas.has(n) && ofrecida(n) && ['regular', 'recursando', 'promocion'].includes(M.estadoDe(est, n)));
     $('[data-campo="materia"]', art).replaceChildren(el('option', { value: '' }, 'Elegí una materia…'),
-      el('optgroup', { label: verano ? 'Intensivos posibles de febrero' : 'Materias del plan' }, ...materias.map((m) => el('option', { value: m.n }, `${etiquetaN(m.n)} · ${m.nombre}${m.opcional ? ' (opcional)' : ''}`))),
+      el('optgroup', { label: verano ? `Intensivos posibles de febrero ${id.slice(0, 4)} (a confirmar)` : 'Materias del plan' }, ...materias.map((m) => el('option', { value: m.n }, `${etiquetaN(m.n)} · ${m.nombre}${m.opcional ? ' (opcional)' : ''}`))),
       habituales.length ? el('optgroup', { label: 'Electivas · suman créditos' }, ...habituales.map(opcionElectiva)) : null,
       grupoLic,
       el('optgroup', { label: 'Volver a cursar (opcional)' }, ...recursables.map((n) => el('option', { value: n, dataset: { recursar: 'si' } }, M.nombreCorto(n)))));
@@ -201,6 +220,22 @@ arts.forEach((art) => {
       guardarMarcas(); pintarCuatris();
       $(`[data-cuatri="${id}"] [data-accion="recursar"][data-materia="${n}"]`)?.focus();
     } else if (b.dataset.accion === 'quitar-materia') cambiarPlan(id, plan[id].filter((x) => x !== n));
+    else if (b.dataset.accion === 'quitar-verano') quitarVerano(id.slice(0, 4));
+    else if (b.dataset.accion === 'confirmar-verano-extra') {
+      const anio = id.slice(0, 4); const sel = $('[data-verano-extra]', art); const m = Number(sel.value);
+      if (!m || extrasDeAnio(anio).includes(m)) return;
+      opciones.veranoExtrasPorAnio[anio] = [...extrasDeAnio(anio), m];
+      guardarOpciones(); pintarOpciones(); pintarCuatris();
+      decir(`Confirmaste ${M.nombreCorto(m)} para febrero ${anio}. Solo vale para ese año.`);
+      $('[data-verano-extra]', art).focus();
+    } else if (b.dataset.accion === 'quitar-oferta') {
+      const anio = id.slice(0, 4);
+      opciones.veranoExtrasPorAnio[anio] = extrasDeAnio(anio).filter((x) => x !== n);
+      if (anio === '2027') opciones.veranoExtras = opciones.veranoExtras.filter((x) => x !== n);
+      guardarOpciones(); pintarOpciones(); pintarCuatris();
+      decir(`Quitaste la oferta de ${M.nombreCorto(n)} para febrero ${anio}.`);
+      $('[data-verano-extra]', art).focus();
+    }
     else if (b.dataset.accion === 'mover-anterior' || b.dataset.accion === 'mover-siguiente') {
       const activos = periodosActivos(); const pos = activos.indexOf(id);
       const hacia = activos[pos + (b.dataset.accion === 'mover-anterior' ? -1 : 1)];
@@ -222,23 +257,27 @@ arts.forEach((art) => {
 });
 
 $('[data-herramientas]').hidden = false;
-$('[data-incluir-verano]').addEventListener('change', (ev) => {
-  opciones.incluirVerano = ev.target.checked; visibles = Math.max(visibles, opciones.incluirVerano ? 4 : CUATRIS_VISIBLES);
-  guardarOpciones(); pintarOpciones(); pintarCuatris();
-  decir(opciones.incluirVerano ? 'Febrero queda disponible como opción. Confirmá la oferta antes de inscribirte.' : 'Intensivos desactivados para nuevas propuestas.');
+function quitarVerano(anio) {
+  const id = `${anio}-VER`; const ns = plan[id] ?? [];
+  if (ns.length && !confirm(`Febrero ${anio} tiene ${ns.length === 1 ? '1 materia' : `${ns.length} materias`} (${ns.map(M.nombreCorto).join(', ')}). Si quitás el intensivo, salen del plan. ¿Seguimos?`)) { decir('No se quitó el intensivo.'); return; }
+  plan[id] = []; opciones.veranos = opciones.veranos.filter((a) => a !== anio);
+  guardarPlan(plan); guardarMarcas(); guardarOpciones(); pintarOpciones(); pintarCuatris();
+  decir(`Quitaste el intensivo de febrero ${anio}.${ns.length ? ' Sus materias salieron del plan.' : ''}`);
+  $('[data-verano-sumar-anio]').focus();
+}
+$('[data-accion="sumar-verano"]').addEventListener('click', () => {
+  const anio = $('[data-verano-sumar-anio]').value; if (!anio || opciones.veranos.includes(anio)) return;
+  opciones.veranos = [...opciones.veranos, anio].sort();
+  guardarOpciones();
+  const rango = periodosActivos().indexOf(`${anio}-VER`);
+  if (rango < visibles) visibles++;
+  pintarOpciones(); pintarCuatris();
+  decir(`Sumaste el intensivo de febrero ${anio}. La oferta de febrero se confirma cada año con la Facultad.`);
+  const art = $(`[data-cuatri="${anio}-VER"]`);
+  art?.scrollIntoView({ block: 'nearest' }); $('[data-campo="materia"]', art)?.focus();
 });
-$('[data-verano-anio]').addEventListener('change', (ev) => { veranoAnio = ev.target.value; pintarOpciones(); });
-$('[data-accion="confirmar-verano-extra"]').addEventListener('click', () => {
-  const n = Number($('[data-verano-extra]').value); if (!n || extrasDeAnio(veranoAnio).includes(n)) return;
-  opciones.veranoExtrasPorAnio[veranoAnio] = [...extrasDeAnio(veranoAnio), n];
-  guardarOpciones(); pintarOpciones(); pintarCuatris();
-});
-$('[data-verano-extras]').addEventListener('click', (ev) => {
-  const b = ev.target.closest('[data-quitar-oferta]'); if (!b) return;
-  const anio = b.dataset.anio; const n = Number(b.dataset.quitarOferta);
-  opciones.veranoExtrasPorAnio[anio] = extrasDeAnio(anio).filter((id) => id !== n);
-  if (anio === '2027') opciones.veranoExtras = opciones.veranoExtras.filter((id) => id !== n);
-  guardarOpciones(); pintarOpciones(); pintarCuatris();
+$('[data-veranos-activos]').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-quitar-verano]'); if (b) quitarVerano(b.dataset.quitarVerano);
 });
 $('[data-finales-previstos]').addEventListener('change', (ev) => {
   if (!ev.target.matches('[data-final-previsto]')) return;

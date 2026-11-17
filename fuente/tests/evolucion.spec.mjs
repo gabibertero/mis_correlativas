@@ -95,10 +95,12 @@ test('febrero es optativo y su cursado regulariza sin inventar aprobación ni co
   await preparar(page, { estado, plan: {} });
   await page.goto('planificador/');
   const verano = page.locator('[data-cuatri="2027-VER"]');
-  await expect(page.locator('[data-incluir-verano]')).not.toBeChecked();
+  await expect(page.locator('[data-veranos-activos] li')).toHaveCount(0);
   await expect(verano).toBeHidden();
-  await page.locator('[data-incluir-verano]').check();
+  await page.locator('[data-verano-sumar-anio]').selectOption('2027');
+  await page.locator('[data-accion="sumar-verano"]').click();
   await expect(verano).toBeVisible();
+  await expect(page.locator('[data-cuatri="2028-VER"]')).toBeHidden();
   await verano.locator('[data-campo="materia"]').selectOption('1');
   await verano.locator('[data-accion="agregar-materia"]').click();
   await expect(verano.locator('[data-resultado-plan][data-materia="1"]')).toHaveValue('regular');
@@ -112,7 +114,8 @@ test('febrero es optativo y su cursado regulariza sin inventar aprobación ni co
   await expect(page.locator('[data-cuatri="2027-1C"] li[data-materia="1"][data-continua]')).toHaveCount(0);
   expect(await leer(page, 'estado')).toEqual(estado);
   await page.reload();
-  await expect(page.locator('[data-incluir-verano]')).toBeChecked();
+  await expect(page.locator('[data-veranos-activos]')).toContainText('Febrero 2027');
+  expect((await leer(page, 'opcionesPlan')).veranos).toEqual(['2027']);
   await expect(verano.locator('[data-resultado-plan][data-materia="1"]')).toHaveValue('regular');
   await sinDesborde(page);
 });
@@ -171,15 +174,19 @@ test('materias externas de la licenciatura suman créditos sin aumentar las 36 o
 test('oferta excepcional de Sistemas se confirma por año y no se repite automáticamente', async ({ page }) => {
   await preparar(page, { plan: {} });
   await page.goto('planificador/');
-  await page.locator('[data-incluir-verano]').check();
-  await page.locator('[data-verano-anio]').selectOption('2027');
-  await page.locator('[data-verano-extra]').selectOption('23');
-  await page.locator('[data-accion="confirmar-verano-extra"]').click();
+  for (const anio of ['2027', '2028']) {
+    await page.locator('[data-verano-sumar-anio]').selectOption(anio);
+    await page.locator('[data-accion="sumar-verano"]').click();
+  }
+  const v27 = page.locator('[data-cuatri="2027-VER"]'); const v28 = page.locator('[data-cuatri="2028-VER"]');
+  await v27.locator('[data-oferta-verano] summary').click();
+  await v27.locator('[data-verano-extra]').selectOption('23');
+  await v27.locator('[data-accion="confirmar-verano-extra"]').click();
   await expect(page.locator('[data-cuatri="2027-VER"] [data-campo="materia"] option[value="23"]')).toHaveCount(1);
   await expect(page.locator('[data-cuatri="2028-VER"] [data-campo="materia"] option[value="23"]')).toHaveCount(0);
-  await page.locator('[data-verano-anio]').selectOption('2028');
-  await page.locator('[data-verano-extra]').selectOption('21');
-  await page.locator('[data-accion="confirmar-verano-extra"]').click();
+  await v28.locator('[data-oferta-verano] summary').click();
+  await v28.locator('[data-verano-extra]').selectOption('21');
+  await v28.locator('[data-accion="confirmar-verano-extra"]').click();
   await expect(page.locator('[data-cuatri="2028-VER"] [data-campo="materia"] option[value="21"]')).toHaveCount(1);
   await expect(page.locator('[data-cuatri="2027-VER"] [data-campo="materia"] option[value="21"]')).toHaveCount(0);
   expect((await leer(page, 'opcionesPlan')).veranoExtrasPorAnio).toEqual({ 2027: [23], 2028: [21] });
