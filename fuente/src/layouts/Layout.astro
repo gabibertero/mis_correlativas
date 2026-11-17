@@ -17,13 +17,15 @@ const ico = {
   electivas: '<path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>',
   licenciaturas: '<path d="m2 9 10-5 10 5-10 5-10-5zM6 11v6c4 3 8 3 12 0v-6M22 9v8"/>',
 };
+// [ícono, texto, href, texto corto opcional]. El corto solo se ve en la barra inferior de celulares angostos;
+// el nombre completo queda como texto para lectores de pantalla.
 const nav = [
   ['inicio', 'Inicio', base],
   ['malla', 'Malla', `${base}malla/`],
   ['simulador', 'Simulador', `${base}simulador/`],
-  ['planificador', 'Planificador', `${base}planificador/`],
+  ['planificador', 'Planificador', `${base}planificador/`, 'Planif.'],
   ['electivas', 'Electivas', `${base}electivas/`],
-  ['licenciaturas', 'Licenciaturas', `${base}licenciaturas/`],
+  ['licenciaturas', 'Licenciaturas', `${base}licenciaturas/`, 'Licenc.'],
 ];
 const actual = Astro.url.pathname;
 const esActual = (href) => (href === base ? actual === base || actual === `${base}index.html` : actual.startsWith(href));
@@ -55,10 +57,11 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
         <a class="marca" href={base}><img src={`${base}favicon.svg`} alt="" width="32" height="32" /><span class="marca-txt">Correlativas</span></a>
         <nav aria-label="Principal">
           <ul>
-            {nav.map(([id, texto, href]) => (
+            {nav.map(([id, texto, href, corto]) => (
               <li><a href={href} aria-current={esActual(href) ? 'page' : undefined}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ico[id]} />
-                <span>{texto}</span>
+                <span class:list={['nav-txt', { 'nav-largo': corto }]}>{texto}</span>
+                {corto && <span class="nav-corto" aria-hidden="true">{corto}</span>}
               </a></li>
             ))}
           </ul>

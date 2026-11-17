@@ -101,6 +101,7 @@ p { margin: 0; }
 .sitio nav a[aria-current] { background: var(--acento-suave); color: var(--acento); }
 .sitio nav a:focus-visible { border-radius: 999px; } /* el foco sigue la forma de píldora (el global la pisaba con 4px) */
 .sitio nav a span { overflow-wrap: normal; } /* nunca cortar una palabra a la mitad (body usa overflow-wrap: anywhere) */
+.sitio nav .nav-corto { display: none; }
 .tema { width: 44px; height: 44px; padding: 0; border-radius: 50%; flex: none; }
 .tema svg { width: 20px; height: 20px; }
 .tema [data-ico='luna'] { display: none; }
@@ -125,13 +126,26 @@ p { margin: 0; }
   .sitio-in { min-height: 56px; }
   .tema { margin-left: auto; }
   .sitio nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; flex: none; background: color-mix(in srgb, var(--sup) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--borde); padding-bottom: env(safe-area-inset-bottom); }
-  .sitio nav ul { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; padding: 0 var(--s-1); }
+  .sitio nav ul { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; padding: 0 2px; }
   .sitio nav li { min-width: 0; }
-  .sitio nav a { display: grid; grid-template-rows: 24px 24px; place-items: center; align-content: center; gap: 0; height: var(--nav-h); min-height: var(--nav-h); padding: 4px; border-radius: var(--r-s); font-size: clamp(.5625rem, 2.5vw, .6875rem); line-height: 1.1; letter-spacing: -.01em; white-space: normal; text-align: center; }
-  .sitio nav a span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-  .sitio nav a[aria-current] { background: transparent; }
-  .sitio nav a[aria-current] svg { background: var(--acento-suave); box-sizing: content-box; padding: 2px 10px; border-radius: 999px; }
+  /* Ítem: ícono en píldora + etiqueta en una sola línea. Todo el alto de la barra es objetivo táctil. */
+  .sitio nav a { flex-direction: column; justify-content: center; gap: 2px; height: var(--nav-h); min-height: var(--nav-h); padding: 0; border-radius: var(--r-s); font-size: .6875rem; line-height: 1.2; letter-spacing: -.01em; text-align: center; }
+  .sitio nav a svg { box-sizing: content-box; padding: 4px 12px; border-radius: 999px; transition: background .15s; }
+  .sitio nav a:hover { background: transparent; }
+  .sitio nav a:focus-visible { outline-offset: -3px; border-radius: var(--r-s); }
+  .sitio nav a[aria-current] { background: transparent; font-weight: 700; }
+  .sitio nav a[aria-current] svg { background: var(--acento-suave); }
   main { padding-top: var(--s-6); }
+}
+@media (max-width: 900px) and (hover: hover) {
+  .sitio nav a:hover svg { background: var(--sup2); }
+  .sitio nav a[aria-current]:hover svg { background: var(--acento-suave); }
+}
+/* Celulares angostos: «Planificador» y «Licenciaturas» no entran en una columna de ~53–72px.
+   Se ve la etiqueta corta y el nombre completo queda para lectores de pantalla (la corta es aria-hidden). */
+@media (max-width: 479px) {
+  .sitio nav .nav-largo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sitio nav .nav-corto { display: inline; }
 }
 
 /* Botones */
