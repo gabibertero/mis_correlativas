@@ -52,7 +52,7 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
     <a class="saltar" href="#contenido">Saltar al contenido</a>
     <header class="sitio">
       <div class="sitio-in">
-        <a class="marca" href={base}><img src={`${base}favicon.svg`} alt="" width="32" height="32" />Correlativas</a>
+        <a class="marca" href={base}><img src={`${base}favicon.svg`} alt="" width="32" height="32" /><span class="marca-txt">Correlativas</span></a>
         <nav aria-label="Principal">
           <ul>
             {nav.map(([id, texto, href]) => (
@@ -158,6 +158,8 @@ const esActual = (href) => (href === base ? actual === base || actual === `${bas
   body[data-sesion="no"] .sitio .tema { background: rgb(255 255 255 / .45); border-color: rgb(15 31 23 / .35); }
   body[data-sesion="no"] .sitio .tema { margin-left: auto; }
   body[data-sesion="no"] .marca img { background: #0f1f17; padding: 3px; }
+  /* En el gate sobra lugar (no hay nav): la marca siempre con texto, aunque en PC angosta se compacte */
+  body[data-sesion="no"] .marca-txt { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
   body[data-sesion="no"] .dlg-sesion { color-scheme: light; }
   body[data-sesion="no"] .dlg-sesion::backdrop { background: transparent; }
   .sesion { flex: none; max-width: 11rem; }

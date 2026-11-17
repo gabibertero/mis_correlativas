@@ -99,11 +99,21 @@ p { margin: 0; }
 .sitio nav a svg { width: 20px; height: 20px; flex: none; }
 .sitio nav a:hover { background: var(--sup2); color: var(--texto); }
 .sitio nav a[aria-current] { background: var(--acento-suave); color: var(--acento); }
+.sitio nav a:focus-visible { border-radius: 999px; } /* el foco sigue la forma de píldora (el global la pisaba con 4px) */
+.sitio nav a span { overflow-wrap: normal; } /* nunca cortar una palabra a la mitad (body usa overflow-wrap: anywhere) */
 .tema { width: 44px; height: 44px; padding: 0; border-radius: 50%; flex: none; }
 .tema svg { width: 20px; height: 20px; }
 .tema [data-ico='luna'] { display: none; }
 .tema[data-modo='claro'] [data-ico='sol'] { display: none; }
 .tema[data-modo='claro'] [data-ico='luna'] { display: block; }
+
+/* PC angosta (901–1079): los 6 links + tema + sesión no entran con la marca completa.
+   La marca queda solo con el logo (el nombre sigue para lectores de pantalla) y los links se juntan un poco. */
+@media (min-width: 901px) and (max-width: 1079px) {
+  .marca-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sitio nav ul { gap: 2px; }
+  .sitio nav a { gap: 6px; }
+}
 
 .pie { border-top: 1px solid var(--borde); padding: var(--s-8) 0; color: var(--suave); font-size: var(--t-s); background: var(--sup); }
 .pie-in { max-width: 66rem; margin: 0 auto; padding-inline: var(--s-4); display: grid; gap: var(--s-4) var(--s-8); grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
