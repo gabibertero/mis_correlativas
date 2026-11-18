@@ -10,7 +10,7 @@
 //  - OPCIONAL: el Seminario (99) existe en la malla pero queda fuera de totales, listas "qué puedo hacer" y del Proyecto Final.
 //  - DESTRABA: cierre transitivo sobre reg+aprob entre materias del plan (sin electivas).
 import { MATERIAS, MATERIAS_PLAN, NIVELES } from '../data/plan.js';
-import { CATALOGO_ELECTIVAS } from '../data/trayectos.js';
+import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 
 export const porN = Object.fromEntries(MATERIAS.map((m) => [m.n, m]));
 export const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -496,6 +496,47 @@ export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones }
     plan[ids[i]] = ordenarPlan(plan[ids[i]]);
   }
   return { plan, sinUbicar: falta().map((m) => m.n) };
+}
+
+// ---------- Planificador · mensaje para compartir ----------
+/** Año del plan a compartir: hasta octubre, el año en curso (todavía no te inscribiste); desde noviembre, el siguiente. */
+export const anioAMandar = (hoy = new Date()) => (hoy.getMonth() >= 10 ? hoy.getFullYear() + 1 : hoy.getFullYear());
+const listaY = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}`);
+const nombreLicCorto = (id) => (LICENCIATURAS.find((l) => l.id === id)?.nombre ?? 'Licenciatura').replace(/^Licenciatura en /, 'Lic. ');
+function lineaWhatsApp(est, n, k, recursar) {
+  const m = itemDe(n);
+  let t = `${k + 1}. ${nombreCorto(n)}`;
+  if (esElectiva(n)) t += m.licenciatura ? ` — ${nombreLicCorto(m.licenciatura)} · ${m.creditos} créditos` : ` — electiva · ${m.creditos} créditos`;
+  const conds = [];
+  if (recursar.has(n)) conds.push('recursado, si me lo aprueban');
+  if (m.correlativasConfirmadas === false) conds.push('correlativas a confirmar');
+  else {
+    const f = faltan(est, m);
+    // «si regularizo A, B y C, y apruebo D y E»: un verbo por tipo, la coma antes de la «y» separa los grupos.
+    const reg = f.reg.length ? `regularizo ${listaY(f.reg.map(nombreCorto))}` : '';
+    const apr = f.aprob.length ? `apruebo ${listaY(f.aprob.map(nombreCorto))}` : '';
+    if (reg || apr) conds.push(`si ${reg && apr ? `${reg}${f.reg.length > 1 ? ',' : ''} y ${apr}` : reg || apr}`);
+  }
+  return conds.length ? `${t} _(${conds.join('; ')})_` : t;
+}
+/**
+ * Mensaje de WhatsApp con lo planificado para `anio`: intensivo de febrero, anuales y cada cuatrimestre.
+ * Las condiciones salen de las correlativas que HOY (estado real) no cumplís. '' si no hay nada planificado.
+ */
+export function textoPlanWhatsApp(est, plan, anio, opciones = {}, { nombre = '', recursar = [] } = {}) {
+  const rec = new Set(recursar);
+  const valida = (ns) => (ns ?? []).filter((n) => itemDe(n));
+  const verano = valida(plan[`${anio}-VER`]);
+  const primero = valida(plan[`${anio}-1C`]);
+  const anuales = primero.filter((n) => itemDe(n).modalidad === 'A');
+  const c1 = primero.filter((n) => !anuales.includes(n));
+  const c2 = valida(plan[`${anio}-2C`]).filter((n) => !primero.includes(n));
+  const secciones = [['☀️ *Intensivo de febrero*', verano], ['📅 *Anuales*', anuales], ['1️⃣ *1er cuatrimestre*', c1], ['2️⃣ *2do cuatrimestre*', c2]]
+    .filter(([, ns]) => ns.length)
+    .map(([titulo, ns]) => [titulo, ...ordenarPlan(ns).map((n, k) => lineaWhatsApp(est, n, k, rec))].join('\n'));
+  if (!secciones.length) return '';
+  const quien = String(nombre ?? '').trim();
+  return [`📚 *Plan ${anio}${quien ? ` · ${quien}` : ''}*`, ...secciones, '_Sujeto a correlativas, oferta e inscripción._'].join('\n\n');
 }
 
 /** Explica qué acción pide cada dependencia directa, sin prometer habilitación automática. */

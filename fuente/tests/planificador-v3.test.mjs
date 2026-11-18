@@ -89,3 +89,53 @@ test('proyeccionDeudas: la cursada actual sigue siendo deuda; un período futuro
 test('CUATRIS trae febreros 2027–2033 (años válidos para `veranos`)', () => {
   assert.deepEqual(CUATRIS.filter(M.esVerano).map((id) => id.slice(0, 4)), ['2027', '2028', '2029', '2030', '2031', '2032', '2033']);
 });
+
+test('anioAMandar: hasta octubre el año en curso; noviembre y diciembre, el siguiente', () => {
+  assert.equal(M.anioAMandar(new Date(2027, 8, 15)), 2027);
+  assert.equal(M.anioAMandar(new Date(2027, 10, 24)), 2028);
+  assert.equal(M.anioAMandar(new Date(2027, 9, 31)), 2027);
+  assert.equal(M.anioAMandar(new Date(2027, 10, 1)), 2028);
+  assert.equal(M.anioAMandar(new Date(2027, 0, 1)), 2027);
+  assert.equal(M.anioAMandar(new Date(2027, 11, 31)), 2028);
+});
+
+test('textoPlanWhatsApp: secciones con materias, condiciones reales, electivas y licenciatura', () => {
+  const a = (e) => ({ estado: e });
+  const est = Object.fromEntries([1, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 17, 19, 20].map((n) => [n, a('aprobada')]));
+  Object.assign(est, { 2: a('recursando'), 9: a('cursando'), 10: a('regular'), 15: a('regular'), 16: a('regular'), 21: a('cursando'), 23: a('abandono') });
+  const plan = {
+    '2026-2C': [2, 9, 21],
+    '2027-VER': [9], '2027-1C': [23, 26, 10, 22, 28, 'e:desarrollo-y-operaciones-devops'],
+    '2027-2C': [29, 32, 'e:criptografia-y-seguridad-criptografica'],
+  };
+  assert.equal(M.textoPlanWhatsApp(est, plan, 2027, { veranos: ['2027'] }, { nombre: 'Gavi', recursar: [10] }), [
+    '📚 *Plan 2027 · Gavi*',
+    '',
+    '☀️ *Intensivo de febrero*',
+    '1. Análisis Matemático II',
+    '',
+    '📅 *Anuales*',
+    '1. Física II _(recursado, si me lo aprueban)_',
+    '2. Diseño de Sistemas de Información',
+    '3. Redes de Datos _(si regularizo Comunicación de Datos)_',
+    '',
+    '1️⃣ *1er cuatrimestre*',
+    '1. Análisis Numérico _(si regularizo Análisis Matemático II y apruebo Álgebra y Geometría Analítica)_',
+    '2. Simulación _(si apruebo Análisis Matemático II)_',
+    '3. Desarrollo y Operaciones (DevOps) — electiva · 3 créditos',
+    '',
+    '2️⃣ *2do cuatrimestre*',
+    '1. Tecnologías para la Automatización _(si regularizo Análisis Numérico y apruebo Análisis Matemático II)_',
+    '2. Ciencia de Datos _(si regularizo Simulación)_',
+    '3. Criptografía y Seguridad Criptográfica — Lic. Seguridad Informática · 3 créditos _(correlativas a confirmar)_',
+    '',
+    '_Sujeto a correlativas, oferta e inscripción._',
+  ].join('\n'));
+  // Sin nombre, sin febrero y sin 2C: solo las secciones con materias.
+  assert.equal(M.textoPlanWhatsApp({}, { '2028-1C': [5, 1] }, 2028), '📚 *Plan 2028*\n\n📅 *Anuales*\n1. Análisis Matemático I\n\n1️⃣ *1er cuatrimestre*\n1. Lógica y Estructuras Discretas\n\n_Sujeto a correlativas, oferta e inscripción._');
+  // Varias condiciones: un verbo por tipo, comas y «y» final.
+  assert.match(M.textoPlanWhatsApp({}, { '2028-1C': [25] }, 2028), /_\(si regularizo Base de Datos, Desarrollo de Software y Diseño de Sistemas de Información, y apruebo Sintaxis y Semántica de los Lenguajes y Paradigmas de Programación\)_/);
+  // Una anual de 1C no se repite en el 2C; nada planificado -> ''.
+  assert.doesNotMatch(M.textoPlanWhatsApp({}, { '2028-1C': [1], '2028-2C': [1] }, 2028), /2do cuatrimestre/);
+  assert.equal(M.textoPlanWhatsApp({}, { '2027-1C': [9] }, 2028), '');
+});
