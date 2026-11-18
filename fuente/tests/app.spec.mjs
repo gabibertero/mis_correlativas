@@ -196,48 +196,7 @@ test.describe('exportar / importar', () => {
   });
 });
 
-test.describe('simulador', () => {
-  test('hipoteticos muestran desbloqueos y NO escriben en localStorage; reset', async ({ page }) => {
-    await page.goto('simulador/');
-    const antes = await page.evaluate(() => JSON.stringify({ ...localStorage }));
-    const f = page.locator('fieldset[data-sim-materia="2"]');
-    await expect(f).toBeVisible();
-    await f.locator('input[value="aprobada"]').check({ force: true });
-    await expect(page.locator('[data-sim-resumen]')).toContainText('materia de prueba');
-    await expect(page.locator('[data-sim-resumen]')).toContainText('Tu estado real no cambia');
-    await expect(page.locator('[data-accion="reset-simulacion"]')).toBeVisible();
-    expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).toBe(antes);
-    expect(await leerLS(page, 'estado')).toBeNull();
-    await page.locator('[data-accion="reset-simulacion"]').click();
-    await expect(page.locator('[data-sim-resumen]')).toContainText('Todavía no marcaste nada');
-    await expect(page.locator('[data-accion="reset-simulacion"]')).toBeHidden();
-    await page.goto('malla/');
-    await expect(page.locator('button.mat[data-materia="2"]')).toHaveAttribute('data-estado', 'recursando');
-  });
-  test('volver atras: el resumen coincide con los radios restaurados', async ({ page }) => {
-    await page.goto('simulador/');
-    await page.locator('fieldset[data-sim-materia="2"] input[value="aprobada"]').check({ force: true });
-    await expect(page.locator('[data-sim-resumen]')).toContainText('materia de prueba');
-    await page.goto('malla/');
-    await page.goBack();
-    await expect(page.locator('fieldset[data-sim-materia="2"] input[value="aprobada"]')).toBeChecked();
-    await expect(page.locator('[data-sim-resumen]')).toContainText('materia de prueba');
-    await expect(page.locator('[data-accion="reset-simulacion"]')).toBeVisible();
-    expect(await leerLS(page, 'estado')).toBeNull();
-  });
-  test('simulador respeta estado real guardado: aprobadas ocultas', async ({ page }) => {
-    await page.goto('simulador/');
-    await expect(page.locator('fieldset[data-sim-materia="1"]')).toBeHidden();
-  });
-  test('volver atras tras marcar no deja resultados inconsistentes', async ({ page }) => {
-    await page.goto('simulador/');
-    await page.locator('fieldset[data-sim-materia="2"] input[value="aprobada"]').check({ force: true });
-    await page.goto('malla/'); await page.goBack();
-    const marcado = await page.locator('fieldset[data-sim-materia="2"] input[value="aprobada"]').isChecked();
-    const txt = await page.locator('[data-sim-resumen]').textContent();
-    expect(marcado ? /materia de prueba/.test(txt) : /Todavía no marcaste/.test(txt)).toBe(true);
-  });
-});
+// Simulador: ver tests/simulador.spec.mjs (necesita sesión ficticia).
 
 test.describe('planificador', () => {
   test('agregar materia que no cumple correlativas avisa que falta; persiste', async ({ page }) => {
