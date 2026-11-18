@@ -28,6 +28,11 @@ const turnos = [
     <div class="herramientas" hidden data-herramientas>
       <button type="button" class="btn-primario" data-accion="proponer-plan">Proponer un plan</button>
       <button type="button" data-accion="sumar-cuatri">Sumar un período</button>
+      <button type="button" class="btn-whatsapp" data-accion="copiar-whatsapp">Copiar plan para WhatsApp</button>
+      <div class="whatsapp" data-whatsapp>
+        <p class="suave" data-whatsapp-ayuda hidden></p>
+        <details class="whatsapp-vista" data-whatsapp-vista><summary>Ver el mensaje</summary><pre data-whatsapp-texto></pre></details>
+      </div>
       <div class="creditos-plan" data-creditos-plan hidden>
         <p class="cr-titulo"><strong>Créditos electivos</strong> <span class="suave">· Ingeniería pide 20</span></p>
         <p class="cr-cifras"><span><strong class="num" data-cr-hoy>0</strong> aprobados hoy</span><span aria-hidden="true">+</span><span><strong class="num" data-cr-plan>0</strong> planificados</span><span aria-hidden="true">=</span><span><strong class="num" data-cr-total>0</strong> de 20</span></p>
@@ -140,6 +145,11 @@ const turnos = [
     --plan-deuda-bg: light-dark(#fde047, #fcd34d);
     --plan-deuda-t: light-dark(#2e2200, #1f1600);
   }
+  .whatsapp { flex-basis: 100%; display: grid; gap: var(--s-1); min-width: 0; }
+  .whatsapp p { margin: 0; font-size: var(--t-xs); }
+  .whatsapp-vista[hidden] { display: none; }
+  .whatsapp-vista summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; font-size: var(--t-s); color: var(--acento2); }
+  .whatsapp-vista pre { margin: 0 0 var(--s-2); padding: var(--s-3); max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; font: 500 var(--t-s)/1.5 var(--f-ui); color: var(--texto); background: var(--sup); border: 1px solid var(--borde); border-left: 4px solid var(--acento); border-radius: var(--r-s); }
   .creditos-plan { flex-basis: 100%; display: grid; gap: var(--s-1); padding: var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); font-size: var(--t-s); }
   .creditos-plan[hidden] { display: none; }
   .creditos-plan p { margin: 0; }

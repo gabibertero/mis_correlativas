@@ -13,7 +13,8 @@ async function sesionFalsa(page, datos = {}) {
     sessionStorage.setItem('planificador:iniciado', '1');
     sessionStorage.setItem('corr:pulled', '1');
     const user = { id: '00000000-0000-4000-8000-000000000003', aud: 'authenticated', role: 'authenticated', email: 'planificador@example.test' };
-    const exp = Math.floor(Date.now() / 1000) + 3600;
+    // Vence en años: algunas pruebas fijan el reloj de la página (page.clock) en el futuro.
+    const exp = Math.floor(Date.now() / 1000) + 5 * 365 * 24 * 3600;
     const token = `${btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${btoa(JSON.stringify({ sub: user.id, aud: user.aud, role: user.role, exp }))}.firma-de-prueba`;
     localStorage.setItem('sb-sqxfimanxgrzvjzbnumj-auth-token', JSON.stringify({ access_token: token, refresh_token: 'solo-prueba', expires_at: exp, expires_in: 3600, token_type: 'bearer', user }));
     for (const [k, v] of Object.entries(datos)) localStorage.setItem(`corr:v1:${k}`, JSON.stringify(v));
@@ -268,5 +269,44 @@ test.describe('planificador: resaltado de deuda', () => {
     await v.locator('[data-accion="agregar-materia"]').click();
     await expect(numerico.locator('mark.deuda[data-deuda="reg"]')).toHaveCount(0);
     await expect(numerico.locator('mark.deuda[data-deuda="aprob"]')).toHaveText('Álgebra y Geometría Analítica');
+  });
+});
+
+test.describe('planificador: copiar plan para WhatsApp', () => {
+  const plan = { '2027-VER': [9], '2027-1C': [23, 22, 'e:desarrollo-y-operaciones-devops'], '2027-2C': [29] };
+  test('noviembre copia el año siguiente, con sus secciones, y se puede ver el mensaje', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.clock.setFixedTime(new Date(2026, 10, 24, 12));
+    await page.goto('planificador/');
+    await guardarLS(page, 'estado', { 1: { estado: 'aprobada' }, 2: { estado: 'recursando' }, 9: { estado: 'cursando' } });
+    await guardarLS(page, 'plan', plan);
+    await guardarLS(page, 'opcionesPlan', { veranos: ['2027'] });
+    await guardarLS(page, 'nombre', 'Gavi');
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-sesion', 'si');
+    const b = page.locator('[data-accion="copiar-whatsapp"]');
+    await expect(b).toHaveText('Copiar plan 2027 para WhatsApp');
+    await b.click();
+    await expect(page.locator('[data-estado-plan]')).toContainText('Copiado: pegalo en WhatsApp');
+    const copiado = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copiado.startsWith('📚 *Plan 2027 · Gavi*')).toBe(true);
+    for (const t of ['☀️ *Intensivo de febrero*\n1. Análisis Matemático II', '📅 *Anuales*\n1. Diseño de Sistemas de Información', '1️⃣ *1er cuatrimestre*',
+      '1. Análisis Numérico _(si regularizo Análisis Matemático II y apruebo Álgebra y Geometría Analítica)_', '— electiva · 3 créditos', '2️⃣ *2do cuatrimestre*']) expect(copiado).toContain(t);
+    await page.locator('[data-whatsapp-vista] summary').click();
+    await expect(page.locator('[data-whatsapp-texto]')).toHaveText(copiado);
+    const w = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
+    expect(w[0]).toBeLessThanOrEqual(w[1]);
+  });
+
+  test('septiembre copia el año en curso; sin materias ese año el botón queda deshabilitado', async ({ page }) => {
+    await page.clock.setFixedTime(new Date(2028, 8, 15, 12));
+    await page.goto('planificador/');
+    await guardarLS(page, 'plan', plan);
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-sesion', 'si');
+    const b = page.locator('[data-accion="copiar-whatsapp"]');
+    await expect(b).toHaveText('Copiar plan 2028 para WhatsApp');
+    await expect(b).toBeDisabled();
+    await expect(page.locator('[data-whatsapp-ayuda]')).toContainText('Todavía no planificaste materias para 2028');
   });
 });

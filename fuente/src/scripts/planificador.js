@@ -2,7 +2,7 @@
 import { MATERIAS, CREDITOS_INGENIERIA } from '../data/plan.js';
 import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 import * as M from '../lib/motor.js';
-import { cargarEstado, cargarElectivas, cargarPlan, guardarPlan, cargarRecursar, guardarRecursar, cargarFechas, guardarFechas, cargarFinales, cargarLicenciatura, cargarOpcionesPlan, guardarOpcionesPlan, CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
+import { cargarEstado, cargarElectivas, cargarPlan, guardarPlan, cargarRecursar, guardarRecursar, cargarFechas, guardarFechas, cargarFinales, cargarLicenciatura, cargarOpcionesPlan, guardarOpcionesPlan, cargarNombre, CUATRIS, CUATRIS_VISIBLES } from '../lib/progreso.js';
 import { $, $$, el, chip, etiquetaN, vacio, textoDias } from './comun.js';
 
 const electEst = cargarElectivas();
@@ -173,6 +173,30 @@ function pintarCuatris() {
   });
   $('[data-accion="sumar-cuatri"]').disabled = visibles >= activos.length;
   pintarCreditos();
+  pintarWhatsApp();
+}
+
+// ---------- Mensaje para WhatsApp ----------
+const anioMensaje = M.anioAMandar(new Date());
+const textoWhatsApp = () => M.textoPlanWhatsApp(est, plan, anioMensaje, opciones, { nombre: cargarNombre(), recursar: [...recursar] });
+function pintarWhatsApp() {
+  const t = textoWhatsApp(); const b = $('[data-accion="copiar-whatsapp"]');
+  b.textContent = `Copiar plan ${anioMensaje} para WhatsApp`;
+  b.disabled = !t;
+  const ayuda = $('[data-whatsapp-ayuda]');
+  ayuda.hidden = !!t;
+  ayuda.textContent = t ? '' : `Todavía no planificaste materias para ${anioMensaje}. Sumalas a febrero, 1º o 2º cuatrimestre ${anioMensaje} para armar el mensaje.`;
+  $('[data-whatsapp-vista]').hidden = !t;
+  $('[data-whatsapp-texto]').textContent = t;
+}
+async function copiarTexto(texto) {
+  try { await navigator.clipboard.writeText(texto); return true; } catch { /* sin permiso o sin API: probamos el método viejo */ }
+  const ta = el('textarea', { readonly: true, class: 'sr-only', 'aria-hidden': 'true' });
+  ta.value = texto; document.body.append(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
 }
 
 function pintarCreditos() {
@@ -294,6 +318,13 @@ $('[data-finales-previstos]').addEventListener('change', (ev) => {
   opciones.finalesPrevistos = $$('[data-final-previsto]:checked').map((input) => clave(input.value));
   guardarOpciones(); pintarCuatris();
   decir('Se actualizó la proyección de finales; el motor verificará sus requisitos antes de darlos por aprobados.');
+});
+$('[data-accion="copiar-whatsapp"]').addEventListener('click', async (ev) => {
+  const b = ev.currentTarget; const t = textoWhatsApp(); if (!t) return;
+  const ok = await copiarTexto(t);
+  b.focus();
+  if (ok) decir(`Copiado: pegalo en WhatsApp. Es tu plan ${anioMensaje}.`);
+  else { $('[data-whatsapp-vista]').open = true; decir('No se pudo copiar solo: abrí «Ver el mensaje», seleccioná el texto y copialo.'); }
 });
 $('[data-accion="sumar-cuatri"]').addEventListener('click', () => {
   visibles++; pintarCuatris();
