@@ -125,11 +125,8 @@ test.describe('dashboard', () => {
     await expect(page.locator('[data-kpi="finales"] [data-valor]')).toHaveText(/^\d+$/);
     const filas = await page.locator('[data-lista="finales"] li[data-materia]').count();
     await expect(page.locator('[data-kpi="finales"] [data-valor]')).toHaveText(String(filas));
-    await expect(page.locator('[data-countdown]')).toHaveAttribute('data-fecha', '2026-11-30');
-    // Días hasta la mesa: se calculan desde hoy (no hardcodeados), igual que la app (fecha local a medianoche).
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const esperados = Math.round((new Date(2026, 10, 30) - hoy) / 86400000);
-    await expect(page.locator('[data-dias]')).toHaveText(String(esperados));
+    // Orden recomendado: AGA (recursando) primero porque es la que más materias traba.
+    await expect(page.locator('[data-orden-finales] > li').first()).toHaveAttribute('data-materia', '2');
   });
   test('estado vacio y estado corrupto en localStorage caen a la semilla sin errores', async ({ page }) => {
     const errs = []; page.on('pageerror', (e) => errs.push(String(e)));
@@ -274,9 +271,9 @@ test.describe('planificador', () => {
     await page.locator('[data-turno="feb-mar-2027"] [data-fecha-editable] input').fill('');
     await expect(page.locator('[data-turno="feb-mar-2027"] [data-turno-cuenta]')).toHaveCount(0);
   });
-  test('dashboard muestra la próxima mesa desde las fechas de final de la cuenta', async ({ page }) => {
-    await page.goto(''); await guardarLS(page, 'finales', { 1: '2099-12-11' }); await page.reload();
-    await expect(page.locator('[data-countdown]')).toBeVisible();
+  test('dashboard muestra la fecha de mesa cargada en el orden recomendado de finales', async ({ page }) => {
+    await page.goto(''); await guardarLS(page, 'finales', { 2: '2099-12-11' }); await page.reload();
+    await expect(page.locator('[data-orden-finales] li[data-materia="2"] time')).toHaveAttribute('datetime', '2099-12-11');
   });
 });
 

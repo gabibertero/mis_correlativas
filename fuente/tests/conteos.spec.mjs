@@ -55,6 +55,9 @@ test('cuenta vacía muestra cero en todos los conteos', async ({ page }) => {
   await preparar(page);
   await page.goto('');
   await comprobarResumen(page, { aprobadas: 0, cursando: 0, finales: 0, pct: 0, niveles: [0, 0, 0, 0, 0] });
+  await expect(page.locator('[data-finales-nombres]')).toBeHidden();
+  await expect(page.locator('#orden-finales [data-orden-vacio]')).toHaveText('No debés finales.');
+  await expect(page.locator('[data-orden-finales] li')).toHaveCount(0);
 });
 
 test('progreso propio coincide en anillo, pasos y niveles sin contar el Seminario', async ({ page }) => {
@@ -64,6 +67,33 @@ test('progreso propio coincide en anillo, pasos y niveles sin contar el Seminari
   await expect(page.locator('[data-kpi="finales"] [data-valor]')).toHaveText('2');
   await expect(page.locator('[data-lista="finales"] li[data-materia]')).toHaveCount(2);
   await expect(page.locator('[data-creditos="ing"] [data-valor]')).toHaveText('6');
+});
+
+test('finales habilitados por nivel y orden recomendado de finales', async ({ page }) => {
+  await preparar(page, parcial);
+  await page.addInitScript(() => localStorage.setItem('corr:v1:finales', JSON.stringify({ 18: '2099-12-11', 9: '2000-01-01' })));
+  await page.goto('');
+  await expect(page.locator('body')).toHaveAttribute('data-sesion', 'si');
+  // Habilitados: AM II (2º nivel) y Economía (3º nivel), en orden de nivel; Base de Datos regular no (le faltan correlativas).
+  const grupos = page.locator('[data-finales-nombres] > li');
+  await expect(grupos).toHaveCount(2);
+  await expect(grupos.nth(0)).toHaveAttribute('data-nivel', '2');
+  await expect(grupos.nth(0).locator('[data-materia]')).toHaveText([/^AM II/]); // breve visible + nombre completo para lectores
+  await expect(grupos.nth(0).locator('[data-materia] [aria-hidden="true"]')).toHaveText('AM II');
+  await expect(grupos.nth(1).locator('[data-materia]')).toHaveText(['Economía']);
+  await expect(page.locator('[data-lista="finales"] li[data-materia]')).toHaveText([/Análisis Matemático II/, /Economía/]);
+  // Orden: AM II traba 4 (Simulación y Automatización la piden aprobada, más IA y Ciencia de Datos),
+  // Economía 1 (Gestión Gerencial), Base de Datos 1 (Ciencia de Datos) pero hoy no se puede rendir.
+  const orden = page.locator('[data-orden-finales] > li');
+  await expect(page.locator('[data-orden-vacio]')).toBeHidden();
+  await expect(orden).toHaveCount(3);
+  expect(await orden.evaluateAll((l) => l.map((x) => [x.dataset.materia, x.dataset.traba, x.dataset.rendible]))).toEqual([['9', '4', 'si'], ['18', '1', 'si'], ['19', '1', 'no']]);
+  await expect(orden.nth(0)).toContainText('Traba 4 materias');
+  await expect(orden.nth(0)).toContainText('2 piden su final');
+  await expect(orden.nth(0)).toContainText('Podés rendirla');
+  await expect(orden.nth(0).locator('time')).toHaveCount(0); // fecha pasada: no se muestra
+  await expect(orden.nth(1).locator('time')).toHaveAttribute('datetime', '2099-12-11');
+  await expect(orden.nth(2)).toContainText('Antes: regularizar Sintaxis y ASI y aprobar Lógica y AED');
 });
 
 test('plan completo muestra 36 y 100% en todos los resúmenes', async ({ page }) => {

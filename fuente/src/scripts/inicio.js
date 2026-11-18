@@ -1,9 +1,28 @@
-// Dashboard: KPIs, avance por nivel, créditos, "qué puedo hacer ahora", cuenta regresiva, exportar/importar.
+// Dashboard: KPIs, avance por nivel, créditos, "qué puedo hacer ahora", orden recomendado de finales, exportar/importar.
 import { CREDITOS_INGENIERIA, CREDITOS_ANALISTA } from '../data/plan.js';
 import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 import * as M from '../lib/motor.js';
-import { PREFIJO, cargarEstado, cargarFechas, cargarFinales, cargarElectivas, cargarLicenciatura, cargarOpcionesPlan, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
-import { $, $$, el, etiquetaN, filaMateria, vacio, fmtFecha } from './comun.js';
+import { PREFIJO, cargarEstado, cargarFinales, cargarElectivas, cargarLicenciatura, cargarOpcionesPlan, armarExport, validarImport, aplicarImport } from '../lib/progreso.js';
+import { $, $$, el, etiquetaN, filaMateria, fmtFecha } from './comun.js';
+
+// Nombres breves para listas compactas (el completo va para lectores de pantalla).
+const BREVE = {
+  1: 'AM I', 2: 'AGA', 3: 'Física I', 4: 'Inglés I', 5: 'Lógica', 6: 'AED', 7: 'Arquitectura', 8: 'Sist. y Procesos',
+  9: 'AM II', 10: 'Física II', 11: 'Ing. y Sociedad', 12: 'Inglés II', 13: 'Sintaxis', 14: 'Paradigmas', 15: 'SO', 16: 'ASI', 17: 'Probabilidad',
+  18: 'Economía', 19: 'Base de Datos', 20: 'Des. de Software', 21: 'COM', 22: 'Análisis Numérico', 23: 'Diseño de Sistemas',
+  24: 'Legislación', 25: 'Calidad de Software', 26: 'Redes', 27: 'Inv. Operativa', 28: 'Simulación', 29: 'Automatización', 30: 'Adm. de SI',
+  31: 'IA', 32: 'Ciencia de Datos', 33: 'Sist. de Gestión', 34: 'Gestión Gerencial', 35: 'Seguridad', 36: 'Proyecto Final', 99: 'Seminario',
+};
+const breve = (n) => BREVE[n] ?? M.nombreCorto(n);
+const nombreBreve = (n) => (breve(n) === M.nombreCorto(n) ? breve(n)
+  : [el('span', { 'aria-hidden': 'true' }, breve(n)), el('span', { class: 'sr-only' }, M.nombreCorto(n))]);
+/** «AGA», «AGA y SO», «AGA, SO y ASI», «AGA, SO, ASI y 4 más». */
+const enumerar = (ns, max = 3) => {
+  const v = ns.slice(0, max).map(breve); const resto = ns.length - v.length;
+  if (resto > 0) return `${v.join(', ')} y ${resto} más`;
+  return v.length > 1 ? `${v.slice(0, -1).join(', ')} y ${v.at(-1)}` : v.join('');
+};
+const plural = (k, uno, varios) => `${k} ${k === 1 ? uno : varios}`;
 
 const reemplazarLista = (cont, items, textoVacio) => {
   $$('ul, p.vacio', cont).forEach((n) => n.remove());
@@ -13,7 +32,7 @@ const reemplazarLista = (cont, items, textoVacio) => {
 function pintar() {
   const est = cargarEstado();
   const r = M.resumen(est);
-  const rend = M.rendibles(est);
+  const rend = M.ordenarPorNivel(M.rendibles(est));
 
   // KPIs + hero
   const kpi = (id, valor, label) => {
@@ -28,6 +47,14 @@ function pintar() {
   kpi('promedio', r.promedio == null ? '—' : r.promedio.toFixed(2).replace('.', ','), `Promedio · ${r.notas} ${r.notas === 1 ? 'nota' : 'notas'}`);
   kpi('finales', r.finales);
   $('[data-kpi="finales"]').dataset.nivelUrgencia = r.urgencia; // ok | medio | alto (0 / 1-2 / 3+)
+  // Cuáles son, agrupados por nivel (1º a 5º) y por Nº dentro de cada nivel.
+  const nombres = $('[data-finales-nombres]');
+  const porNivel = new Map();
+  for (const n of rend) { const nv = M.itemDe(n).nivel; porNivel.set(nv, [...(porNivel.get(nv) ?? []), n]); }
+  nombres.replaceChildren(...[...porNivel].map(([nv, ns]) => el('li', { dataset: { nivel: nv } },
+    el('span', { class: 'kf-nv' }, `${nv}º nivel`, el('span', { class: 'sr-only' }, ':')),
+    ...ns.map((n) => el('span', { class: 'kf-m', dataset: { materia: n }, title: M.nombreCorto(n) }, ...[nombreBreve(n)].flat())))));
+  nombres.hidden = !rend.length;
   kpi('proy-cursando', r.proyCursando.pct);
   kpi('proy-finales', r.proyFinales.pct);
   for (const [id, n] of [['avance', r.aprobadas], ['proy-cursando', r.proyCursando.n], ['proy-finales', r.proyFinales.n]]) {
@@ -79,21 +106,28 @@ function pintar() {
       el('span', {}, it.electiva ? 'Electiva' : M.nombreCorto(it.n), el('small', { dataset: { razon: '' } }, it.razon)))), 'Sin materias propuestas.');
   }
 
-  const examenes = M.examenesDeFinales(cargarFinales());
-  // Próximos finales confirmados (ascendente desde hoy)
-  const lf = $('[data-proximos-finales]');
-  lf.replaceChildren(...M.proximosFinales(examenes, est).map((e) => el('li', { dataset: { materia: e.materia, fecha: e.fecha, tipo: e.tipo, ...(e.opcional && { opcional: 'si' }) } },
-    el('time', { datetime: e.fecha }, fmtFecha(M.parseFecha(e.fecha))), el('strong', {}, M.nombreCorto(e.materia)), el('small', {}, e.etiqueta))));
-
-  // Cuenta regresiva
-  const sec = $('#cuenta-regresiva');
-  $$('[data-countdown], p.vacio', sec).forEach((n) => n.remove());
-  const p = M.proximaMesa(examenes, cargarFechas(), est);
-  if (!p) { lf.before(el('p', { class: 'vacio' }, 'No hay mesas cargadas. Poné la fecha del final en cada materia, en la Malla.')); return; }
-  lf.before(el('div', { dataset: { countdown: '', fecha: p.fecha, materia: p.materia ?? '' } },
-    el('p', { class: 'cuenta-n' }, el('span', { class: 'num', dataset: { dias: '' } }, String(p.dias)), el('span', {}, p.dias === 1 ? 'día' : p.dias === 0 ? 'hoy' : 'días')),
-    el('p', { class: 'cuenta-m' }, el('strong', {}, p.materia ? M.nombreCorto(p.materia) : p.etiqueta)),
-    el('p', { class: 'suave' }, el('time', { datetime: p.fecha }, fmtFecha(M.parseFecha(p.fecha))), p.materia ? ` · ${p.etiqueta}` : '')));
+  // Orden recomendado de finales: primero los que más materias traban a futuro.
+  const fechas = cargarFinales();
+  const orden = M.recomendacionFinales(est);
+  const lo = $('[data-orden-finales]');
+  lo.replaceChildren(...orden.map((f) => {
+    const fecha = fechas[f.n] && M.diasHasta(fechas[f.n]) >= 0 ? fechas[f.n] : null;
+    const antes = f.falta && [
+      f.falta.regularizar.length && `regularizar ${enumerar(f.falta.regularizar)}`,
+      f.falta.aprobar.length && `aprobar ${enumerar(f.falta.aprobar)}`,
+      ...f.falta.extra.filter((x) => x.startsWith('PPS')),
+    ].filter(Boolean).join(' y ');
+    return el('li', { dataset: { materia: f.n, posicion: f.posicion, traba: f.traba, trabaDirectas: f.trabaDirectas, rendible: f.rendible ? 'si' : 'no' } },
+      el('span', { class: 'of-pos num', 'aria-hidden': 'true' }, String(f.posicion), el('small', {}, 'º')),
+      el('strong', { class: 'of-nombre' }, M.nombreCorto(f.n)),
+      el('p', { class: 'of-traba' }, f.traba ? `Traba ${plural(f.traba, 'materia', 'materias')}` : 'No traba otras materias',
+        f.trabaDirectas ? el('small', {}, ` · ${plural(f.trabaDirectas, 'pide', 'piden')} su final`) : null),
+      el('p', { class: 'of-estado' },
+        f.rendible ? el('span', { class: 'insignia-hab' }, 'Podés rendirla') : el('span', { class: 'of-antes' }, antes ? `Antes: ${antes}` : 'Todavía no se puede rendir'),
+        fecha ? el('time', { class: 'of-fecha', datetime: fecha }, `Mesa: ${fmtFecha(M.parseFecha(fecha))}`) : null));
+  }));
+  lo.hidden = !orden.length;
+  $('[data-orden-vacio]').hidden = !!orden.length;
 }
 pintar();
 // Al volver atrás el navegador puede restaurar el DOM anterior sin ejecutar de nuevo el script.
