@@ -15,19 +15,22 @@ const nueva = (licenciatura, nombre, desde, nombreOriginal = nombre) => ({
   creditos: 3, criterioCreditos: 'Configuración solicitada: 3 créditos al aprobar una asignatura nueva del trayecto elegido.',
 });
 
+// Por el momento los Trabajos Finales Integradores NO suman créditos electivos (decisión de Gabi, 2026-11-17).
+const sinCreditos = (e) => ({ ...e, creditos: 0, criterioCreditos: 'Por el momento no suma créditos electivos.' });
+
 const seguridad = [
   nueva('seguridad', 'Criptografía y Seguridad Criptográfica', 2026),
   nueva('seguridad', 'Ingeniería Social y Ética', 2026),
   nueva('seguridad', 'Seguridad en Infraestructura', 2026),
   nueva('seguridad', 'Gestión y Gobierno de la Seguridad Informática', 2027),
   nueva('seguridad', 'Análisis Forense y Pericial', 2027),
-  nueva('seguridad', 'Trabajo Final Integrador (Seguridad Informática)', 2027, 'Trabajo Final Integrador'),
+  sinCreditos(nueva('seguridad', 'Trabajo Final Integrador (Seguridad Informática)', 2027, 'Trabajo Final Integrador')),
 ];
 const ia = [
   nueva('ia', 'Aprendizaje Automático', 2026),
   nueva('ia', 'Visión Artificial y Lenguaje Natural', 2026),
   nueva('ia', 'Aprendizaje Profundo', 2027),
-  nueva('ia', 'Trabajo Final Integrador (Inteligencia Artificial)', 2027, 'Trabajo Final Integrador'),
+  sinCreditos(nueva('ia', 'Trabajo Final Integrador (Inteligencia Artificial)', 2027, 'Trabajo Final Integrador')),
 ];
 
 export const LICENCIATURAS = [

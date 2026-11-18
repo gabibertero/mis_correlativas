@@ -10,7 +10,7 @@ const ordenar = (a, b) => (a.n === 99 ? 1 : b.n === 99 ? -1 : a.n - b.n);
 const grupos = NIVELES.map((nv) => ({ id: `n${nv}`, nombre: NOMBRE_NIVEL[nv], materias: MATERIAS.filter((m) => m.nivel === nv).sort(ordenar).map((m) => ({ ...m, id: m.n })) }));
 grupos.push({ id: 'electivas', nombre: 'Electivas y materias de tu licenciatura', materias: CATALOGO_ELECTIVAS.map((e) => ({ ...e, id: idElectiva(e) })) });
 const FILTROS = [['debo', 'Lo que debo'], ['cursar', 'Puedo cursar'], ['todas', 'Todas']];
-const detalle = (m) => m.licenciatura ? `Licenciatura · ${m.creditos} créditos al aprobar · desde ${m.desde}` : typeof m.id === 'string' ? `${m.creditos} créditos al aprobar` : m.opcional ? 'Opcional · no cuenta en las 36' : '';
+const detalle = (m) => m.licenciatura ? `Licenciatura · ${m.creditos > 0 ? `${m.creditos} créditos al aprobar` : 'por ahora no suma créditos'} · desde ${m.desde}` : typeof m.id === 'string' ? `${m.creditos} créditos al aprobar` : m.opcional ? 'Opcional · no cuenta en las 36' : '';
 const TILES = [['aprobadas', 'Aprobadas', 'de 36'], ['cursadas', 'Cursadas', 'incluye aprobadas'], ['creditos', 'Créditos Ingeniería', 'electivas'], ['analista', 'Créditos Analista', '3er nivel']];
 ---
 <Layout titulo="Simulador" descripcion="Compará escenarios de cursado, finales y créditos sin modificar tu progreso.">

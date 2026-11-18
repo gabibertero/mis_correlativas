@@ -40,7 +40,7 @@ export const MATERIAS = [
   { n: 99, nombre: 'Seminario Integrador',                       nivel: 3, modalidad: '2C',    reg: [16],        aprob: [6, 8, 13, 14], hs: 4, integradora: true,
     titulo: 'analista',
     opcional: true,         // Gabi NO lo hace: fuera de los totales del plan (36 materias)
-    creditosElectivos: 6,   // si queda aprobado suma 6 créditos electivos SOLO para Ingeniería (no cuenta para Analista)
+    creditosElectivos: 0,   // por el momento NO suma créditos electivos (decisión de Gabi, 2026-11-17; antes sumaba 6 a Ingeniería)
     finalExigeTodasHasta: 23, // para rendirlo: 1–23 aprobadas (título Analista Dev. Universitario)
     nota: 'Condición para rendir y acceder al título de Analista: aprobar las materias 1 a 23.' },
 

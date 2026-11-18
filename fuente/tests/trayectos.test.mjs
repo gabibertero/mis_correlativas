@@ -23,10 +23,19 @@ test('catálogo ampliado conserva las electivas y evita colisiones entre trabajo
 
 test('asignaturas de trayectos distinguen acceso y datos académicos pendientes', () => {
   for (const e of CATALOGO_ELECTIVAS.filter((e) => e.licenciatura)) {
-    assert.equal(e.creditos, 3);
+    assert.equal(e.creditos, e.nombreOriginal === 'Trabajo Final Integrador' ? 0 : 3); // los TFI por ahora no suman
     assert.equal(e.requisitoAcceso, 23);
     assert.equal(e.correlativasConfirmadas, false);
     assert.equal(e.modalidad, null);
     assert.ok([2026, 2027].includes(e.desde));
   }
+});
+
+test('por el momento los Trabajos Finales Integradores y el Seminario no suman créditos', async () => {
+  const M = await import('../src/lib/motor.js');
+  const tfi = CATALOGO_ELECTIVAS.filter((e) => e.nombreOriginal === 'Trabajo Final Integrador');
+  const elect = Object.fromEntries(tfi.map((e) => [slug(e.nombre), 'aprobada']));
+  assert.deepEqual(M.creditos(elect, CATALOGO_ELECTIVAS, { 99: { estado: 'aprobada' } }, 'seguridad'), { ing: 0, analista: 0 });
+  assert.equal(M.textoCreditos(tfi[0]), 'no suma créditos');
+  assert.equal(M.textoCreditos({ creditos: 3 }), '3 créditos');
 });

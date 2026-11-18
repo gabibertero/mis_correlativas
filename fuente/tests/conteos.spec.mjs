@@ -66,7 +66,7 @@ test('progreso propio coincide en anillo, pasos y niveles sin contar el Seminari
   await comprobarResumen(page, { aprobadas: 2, cursando: 3, finales: 5, pct: 6, niveles: [2, 0, 0, 0, 0] });
   await expect(page.locator('[data-kpi="finales"] [data-valor]')).toHaveText('2');
   await expect(page.locator('[data-lista="finales"] li[data-materia]')).toHaveCount(2);
-  await expect(page.locator('[data-creditos="ing"] [data-valor]')).toHaveText('6');
+  await expect(page.locator('[data-creditos="ing"] [data-valor]')).toHaveText('0'); // el Seminario por el momento no suma créditos
 });
 
 test('finales habilitados por nivel y orden recomendado de finales', async ({ page }) => {

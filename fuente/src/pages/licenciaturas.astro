@@ -11,7 +11,7 @@ const fuente = 'https://www.frc.utn.edu.ar/novedades/2026/licenciaturas-en-segur
     <p class="eyebrow">Un trayecto a elección</p>
     <h1>Licenciaturas</h1>
     <p class="lead">Seguí Ingeniería y una licenciatura en el mismo lugar.</p>
-    <p class="suave">Las materias que ya pertenecen a Sistemas conservan su estado en la malla. Las nuevas materias de tu licenciatura elegida suman 3 créditos electivos cada una cuando las aprobás.</p>
+    <p class="suave">Las materias que ya pertenecen a Sistemas conservan su estado en la malla. Las nuevas materias de tu licenciatura elegida suman 3 créditos electivos cada una cuando las aprobás (por ahora, el Trabajo Final Integrador no suma).</p>
   </header>
 
   <section class="card eleccion-trayecto" aria-labelledby="h-eleccion">
@@ -61,7 +61,7 @@ const fuente = 'https://www.frc.utn.edu.ar/novedades/2026/licenciaturas-en-segur
         <li class="card lic-materia" data-licenciatura-materia={e.licenciatura} data-electiva={slug(e.nombre)} hidden>
           <div>
             <h3>{e.nombreOriginal ?? e.nombre}</h3>
-            <p class="suave">Implementación anunciada: {e.desde} · 3 créditos al aprobar</p>
+            <p class="suave">Implementación anunciada: {e.desde} · {e.creditos > 0 ? `${e.creditos} créditos al aprobar` : 'por ahora no suma créditos'}</p>
           </div>
           <p class="lic-estado" data-licenciatura-estado><span class="chip" data-estado="pendiente">Pendiente</span></p>
           <label>Estado de {e.nombreOriginal ?? e.nombre}
@@ -76,7 +76,8 @@ const fuente = 'https://www.frc.utn.edu.ar/novedades/2026/licenciaturas-en-segur
   <section class="card lic-reglas" aria-labelledby="h-creditos-lic">
     <h2 id="h-creditos-lic">Cómo se cuentan</h2>
     <ul>
-      <li>Solo las materias nuevas aprobadas del trayecto elegido suman 3 créditos electivos cada una.</li>
+      <li>Solo las materias nuevas aprobadas del trayecto elegido suman 3 créditos electivos cada una. Por el momento, el Trabajo Final Integrador no suma créditos.</li>
+      <li>El Seminario Integrador (Analista) por el momento tampoco suma créditos electivos.</li>
       <li>Regular, cursando, promoción, libre o abandono no suman créditos hasta la aprobación.</li>
       <li>Las materias compartidas con Sistemas no se duplican ni se vuelven a contar como electivas.</li>
       <li>Las materias nuevas no cambian el total de 36 materias obligatorias de Ingeniería.</li>

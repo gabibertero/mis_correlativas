@@ -75,7 +75,7 @@ function filaMateriaPlan(n, i, proyDeuda) {
     el('span', { class: 's-nom' }, M.nombreCorto(n),
       elec ? el('small', { class: 'insignias-plan' },
         el('span', { class: 'insignia-tipo' }, tipo === 'licenciatura' ? nombreLic(m.licenciatura) : 'Electiva'),
-        el('span', { class: 'insignia-cr' }, `+${m.creditos} créditos`)) : el('small', {}, `${m.hs} hs semanales de referencia`),
+        el('span', { class: 'insignia-cr', dataset: { sinCreditos: m.creditos > 0 ? 'no' : 'si' } }, m.creditos > 0 ? `+${m.creditos} créditos` : 'No suma créditos')) : el('small', {}, `${m.hs} hs semanales de referencia`),
       el('small', { class: 'modalidad', dataset: { modalidad: M.esVerano(ids[i]) ? 'Intensivo en febrero' : M.modalidadInfo(m).label } }, M.esVerano(ids[i]) ? 'Intensivo en febrero · oferta a confirmar' : M.modalidadInfo(m).label || 'Dictado a confirmar'),
       !M.esVerano(ids[i]) && M.esContracuatri(n, ids[i]) ? el('small', { class: 'contra-cuatri', dataset: { contracuatri: 'si' } }, 'Contracuatrimestre: menos cátedras') : null,
       debe ? el('small', { class: 'etiqueta-deuda' }, 'Depende de algo que debés') : null,
@@ -160,7 +160,7 @@ function pintarCuatris() {
     const electivas = catalogo.filter((e) => !usadas.has(M.idElectiva(e)) && ofrecida(M.idElectiva(e)) && (M.sinCursar(M.estadoDe(est, M.idElectiva(e))) || M.estadoDe(est, M.idElectiva(e)) === 'cursando') && (!e.desde || Number(id.slice(0, 4)) >= e.desde));
     const habituales = electivas.filter((e) => !e.licenciatura);
     const deLic = electivas.filter((e) => e.licenciatura);
-    const opcionElectiva = (e) => el('option', { value: M.idElectiva(e) }, `${e.nombre} (+${e.creditos} cr)`);
+    const opcionElectiva = (e) => el('option', { value: M.idElectiva(e) }, `${e.nombre} (${e.creditos > 0 ? `+${e.creditos} cr` : 'sin créditos'})`);
     const grupoLic = verano ? null
       : !licElegida ? el('optgroup', { label: 'Licenciatura' }, el('option', { value: '', disabled: true }, 'Elegí tu licenciatura en la página Licenciaturas'))
       : el('optgroup', { label: `${licElegida.nombre} · suman créditos` }, ...(deLic.length ? deLic.map(opcionElectiva) : [el('option', { value: '', disabled: true }, licElegida.materias.length ? 'Ya están todas en tu plan o no se dictan este año' : 'Sin materias publicadas todavía')]));

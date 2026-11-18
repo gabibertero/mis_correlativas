@@ -546,13 +546,15 @@ export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones }
 
 // ---------- Planificador · mensaje para compartir ----------
 /** Año del plan a compartir: hasta octubre, el año en curso (todavía no te inscribiste); desde noviembre, el siguiente. */
+/** Texto corto de créditos de una electiva o materia de licenciatura. */
+export const textoCreditos = (e) => (e?.creditos > 0 ? `${e.creditos} créditos` : 'no suma créditos');
 export const anioAMandar = (hoy = new Date()) => (hoy.getMonth() >= 10 ? hoy.getFullYear() + 1 : hoy.getFullYear());
 const listaY = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}`);
 const nombreLicCorto = (id) => (LICENCIATURAS.find((l) => l.id === id)?.nombre ?? 'Licenciatura').replace(/^Licenciatura en /, 'Lic. ');
 function lineaWhatsApp(est, n, k, recursar) {
   const m = itemDe(n);
   let t = `${k + 1}. ${nombreCorto(n)}`;
-  if (esElectiva(n)) t += m.licenciatura ? ` — ${nombreLicCorto(m.licenciatura)} · ${m.creditos} créditos` : ` — electiva · ${m.creditos} créditos`;
+  if (esElectiva(n)) t += m.licenciatura ? ` — ${nombreLicCorto(m.licenciatura)} · ${textoCreditos(m)}` : ` — electiva · ${textoCreditos(m)}`;
   const conds = [];
   if (recursar.has(n)) conds.push('recursado, si me lo aprueban');
   if (m.correlativasConfirmadas === false) conds.push('correlativas a confirmar');

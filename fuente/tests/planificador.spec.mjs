@@ -109,15 +109,13 @@ test.describe('seminario opcional', () => {
     await expect(page.locator('button.mat[data-materia="99"]')).toContainText('Opcional');
     await expect(page.locator('section[data-nivel="3"] [data-nivel-avance]')).toContainText('/6');
   });
-  test('aprobar el Seminario suma 6 créditos solo a Ingeniería', async ({ page }) => {
+  test('aprobar el Seminario por el momento no suma créditos', async ({ page }) => {
     await page.goto('');
     await guardarLS(page, 'estado', { 99: { estado: 'aprobada' } });
     await page.reload();
-    await expect(page.locator('[data-creditos="ing"] [data-valor]')).toHaveText('6');
+    await expect(page.locator('[data-creditos="ing"] [data-valor]')).toHaveText('0');
     await expect(page.locator('[data-creditos="analista"] [data-valor]')).toHaveText('0');
     await expect(page.locator('[data-kpi="aprobadas"] [data-valor]')).toHaveText('0');
-    await page.goto('electivas/');
-    await expect(page.locator('[data-seminario-creditos]')).toBeVisible();
   });
   test('urgencia: 0 finales = ok', async ({ page }) => {
     await page.goto('');

@@ -1,6 +1,6 @@
 // Helpers de DOM compartidos. Siempre textContent / nodos: nunca innerHTML con datos.
 import { ETIQUETA } from '../lib/vista.js';
-import { nombreCorto } from '../lib/motor.js';
+import { nombreCorto, esElectiva, itemDe } from '../lib/motor.js';
 
 export const $ = (sel, raiz = document) => raiz.querySelector(sel);
 export const $$ = (sel, raiz = document) => [...raiz.querySelectorAll(sel)];
@@ -18,7 +18,8 @@ export function el(tag, props = {}, ...hijos) {
   return nodo;
 }
 
-export const etiquetaN = (n) => (n === 99 ? 'S' : String(n));
+// Electivas: 'E'; materias de licenciatura: 'L' (nunca el id interno 'e:<slug>').
+export const etiquetaN = (n) => (esElectiva(n) ? (itemDe(n).licenciatura ? 'L' : 'E') : n === 99 ? 'S' : String(n));
 export const chip = (estado, texto = ETIQUETA[estado]) => el('span', { class: 'chip', dataset: { estado } }, texto);
 /** <li data-materia><span class="n num">N</span>Nombre<small>extra</small></li> */
 export function filaMateria(n, extra) {

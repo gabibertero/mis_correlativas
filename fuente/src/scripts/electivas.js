@@ -58,10 +58,8 @@ function pintar() {
     $('[data-valor]', caja).textContent = v;
     $('progress', caja).value = Math.min(v, max);
   }
-  const sem = $('[data-seminario-creditos]');
-  if (sem) sem.hidden = M.estadoDe(est, 99) !== 'aprobada';
   const trayecto = LICENCIATURAS.find((l) => l.id === licenciatura);
-  $('[data-trayecto-electivas]').textContent = trayecto ? `${trayecto.nombre}: solo sus materias nuevas aprobadas suman 3 créditos cada una.` : 'Podés sumar las materias nuevas de una licenciatura.';
+  $('[data-trayecto-electivas]').textContent = trayecto ? `${trayecto.nombre}: solo sus materias nuevas aprobadas suman 3 créditos cada una (el Trabajo Final Integrador, por ahora, no suma).` : 'Podés sumar las materias nuevas de una licenciatura.';
   $('[data-resumen-electivas]').replaceChildren('Hoy podés cursar ', el('b', {}, String(puedo)), ` de ${activas}. ${ELECTIVAS.length} electivas del catálogo${activas > ELECTIVAS.length ? ` y ${activas - ELECTIVAS.length} materias nuevas de tu licenciatura` : ''}.`);
   document.dispatchEvent(new Event('electivas-pintadas'));
 }

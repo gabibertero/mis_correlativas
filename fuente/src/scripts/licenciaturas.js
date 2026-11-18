@@ -38,7 +38,7 @@ function pintar() {
   const regulares = materias.filter((e) => regularizada(elect[M.slug(e.nombre)]) && elect[M.slug(e.nombre)] !== 'aprobada').length;
   $('[data-licenciatura-aprobadas]').textContent = aprobadas;
   $('[data-licenciatura-total]').textContent = ` de ${materias.length} materias nuevas aprobadas`;
-  $('[data-licenciatura-creditos]').textContent = aprobadas * 3;
+  $('[data-licenciatura-creditos]').textContent = materias.filter((e) => elect[M.slug(e.nombre)] === 'aprobada').reduce((a, e) => a + e.creditos, 0);
   $('[data-licenciatura-regularizadas]').textContent = `${regulares} ${regulares === 1 ? 'materia regularizada pendiente de aprobación' : 'materias regularizadas pendientes de aprobación'}.`;
   for (const fila of $$('[data-licenciatura-materia]')) {
     fila.hidden = fila.dataset.licenciaturaMateria !== elegida;

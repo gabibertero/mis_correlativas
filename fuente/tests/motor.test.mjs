@@ -349,13 +349,13 @@ test('urgencia de finales: 0 ok, 1-2 medio, 3+ alto', () => {
   assert.equal(M.resumen(ESTADO_INICIAL).urgencia, 'alto'); // 3 finales
 });
 
-test('créditos: el Seminario aprobado suma 6 solo a Ingeniería', () => {
+test('créditos: el Seminario aprobado por el momento no suma créditos', () => {
   const elect = { 'backend-de-aplicaciones': 'aprobada', 'green-software': 'aprobada', 'testing-de-software': 'cursando' };
   assert.deepEqual(M.creditos(elect, ELECTIVAS), { ing: 7, analista: 4 });
   assert.deepEqual(M.creditos(elect, ELECTIVAS, {}), { ing: 7, analista: 4 });
   assert.deepEqual(M.creditos(elect, ELECTIVAS, { 99: { estado: 'regular' } }), { ing: 7, analista: 4 }); // no aprobado: nada
-  assert.deepEqual(M.creditos(elect, ELECTIVAS, { 99: { estado: 'aprobada' } }), { ing: 13, analista: 4 });
-  assert.deepEqual(M.creditos({}, ELECTIVAS, { 99: { estado: 'aprobada' } }), { ing: 6, analista: 0 });
+  assert.deepEqual(M.creditos(elect, ELECTIVAS, { 99: { estado: 'aprobada' } }), { ing: 7, analista: 4 });
+  assert.deepEqual(M.creditos({}, ELECTIVAS, { 99: { estado: 'aprobada' } }), { ing: 0, analista: 0 });
 });
 
 // ---------- Planificador: validar y proponer ----------

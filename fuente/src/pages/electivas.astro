@@ -28,7 +28,7 @@ const habilitadas = lista.filter((e) => !e.licenciatura && e.ok).length;
       <p class="cred-n"><b class="num" data-valor>0</b><span class="de">/{CREDITOS_ANALISTA}</span><span class="cred-u">créditos</span></p>
       <progress max={CREDITOS_ANALISTA} value="0" aria-label="Créditos de tercer nivel para Analista"></progress>
     </div>
-    <p class="suave sem-cred" data-seminario-creditos hidden>Incluye 6 créditos del Seminario Integrador (cuentan para Ingeniería, no para Analista).</p>
+    
   </section>
 
   <section class="seccion" data-vista="electivas" aria-labelledby="h-lista">
@@ -57,7 +57,7 @@ const habilitadas = lista.filter((e) => !e.licenciatura && e.ok).length;
               <p class="suave el-meta">{e.licenciatura ? `Materia nueva de licenciatura · desde ${e.desde}` : MODALIDAD[e.modalidad]}</p>
             </div>
             <span class="el-nv">{e.licenciatura ? "Lic." : `N${e.nivel}`}</span>
-            <span class="cr"><b class="num">{e.creditos}</b><span class="cr-u"> cr.</span></span>
+            {e.creditos > 0 ? <span class="cr"><b class="num">{e.creditos}</b><span class="cr-u"> cr.</span></span> : <span class="cr cr-sin">Sin créditos</span>}
             <p class="el-est">
               {e.ok ? <span class="chip chip-hab">Habilitada</span> : <span class="chip" data-estado="pendiente">Bloqueada</span>}
             </p>
@@ -144,4 +144,5 @@ const habilitadas = lista.filter((e) => !e.licenciatura && e.ok).length;
     .el-est { justify-self: start; }
     .cr { justify-self: center; } .sel select { width: 100%; }
   }
+  .cr-sin { font-size: var(--t-xs); font-weight: 600; color: var(--suave); white-space: nowrap; }
 </style>
