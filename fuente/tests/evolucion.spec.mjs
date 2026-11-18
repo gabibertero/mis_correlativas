@@ -54,15 +54,15 @@ test('rendir Redes mantiene regulares SO y Comunicación sin exigir ambos finale
 test('simular regularizar y aprobar produce habilitaciones distintas sin guardar estados', async ({ page }) => {
   await preparar(page);
   await page.goto('simulador/');
-  for (const n of [1, 2]) await page.locator(`[data-sim-materia="${n}"] [data-sim-estado]`).selectOption('regular');
+  for (const n of [1, 2]) await page.locator(`[data-sim-materia="${n}"] [data-sim-op="regular"]`).click();
   await expect(page.locator('[data-sim-lista="cursar"] li[data-materia="9"]')).toBeVisible();
   await expect(page.locator('[data-sim-lista="cursar"] li[data-materia="18"]')).toHaveCount(0);
   expect(await leer(page, 'estado')).toEqual({});
-  for (const n of [1, 2]) await page.locator(`[data-sim-materia="${n}"] [data-sim-estado]`).selectOption('aprobada');
+  for (const n of [1, 2]) await page.locator(`[data-sim-materia="${n}"] [data-sim-op="aprobada"]`).click();
   await expect(page.locator('[data-sim-lista="cursar"] li[data-materia="18"]')).toBeVisible();
   expect(await leer(page, 'estado')).toEqual({});
   await page.locator('[data-accion="reset-simulacion"]').click();
-  await expect(page.locator('[data-sim-resumen]')).toContainText('Elegí un estado de prueba');
+  await expect(page.locator('[data-sim-resumen]')).toContainText('Elegí qué pasaría');
   await sinDesborde(page);
 });
 
@@ -163,10 +163,15 @@ test('materias externas de la licenciatura suman créditos sin aumentar las 36 o
   await expect(page.locator('li[data-electiva]:visible')).toHaveCount(6);
   await expect(page.locator(`li[data-electiva="${id}"] select`)).toHaveValue('aprobada');
   await page.goto('simulador/');
-  await page.locator('[data-sim-ver-aprobadas]').check();
-  await page.locator(`[data-sim-materia="e:${id}"] [data-sim-estado]`).selectOption('regular');
+  // Aprobada no se simula (no hay nada que cambiar): la fila no aparece en ningún filtro.
+  await page.locator('[data-sim-filtro][value="todas"]').check({ force: true });
+  await expect(page.locator(`[data-sim-materia="e:${id}"]`)).toBeHidden();
   await expect(page.locator('[data-sim-real="creditos"]')).toHaveText('3');
-  await expect(page.locator('[data-sim-proy="creditos"]')).toHaveText('0');
+  await expect(page.locator('[data-sim-proy="creditos"]')).toHaveText('3');
+  // Aprobar en el escenario una materia regular no cambia créditos (son obligatorias).
+  await page.locator('[data-sim-materia="23"] [data-sim-op="aprobada"]').click();
+  await expect(page.locator('[data-sim-proy="aprobadas"]')).toHaveText('1');
+  await expect(page.locator('[data-sim-proy="creditos"]')).toHaveText('3');
   expect((await leer(page, 'electivas'))[id]).toBe('aprobada');
   await sinDesborde(page);
 });
