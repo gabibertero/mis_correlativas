@@ -10,7 +10,7 @@
 //  - OPCIONAL: el Seminario (99) existe en la malla pero queda fuera de totales, listas "qué puedo hacer" y del Proyecto Final.
 //  - DESTRABA: cierre transitivo sobre reg+aprob entre materias del plan (sin electivas).
 import { MATERIAS, MATERIAS_PLAN, NIVELES } from '../data/plan.js';
-import { CATALOGO_ELECTIVAS } from '../data/trayectos.js';
+import { CATALOGO_ELECTIVAS, LICENCIATURAS } from '../data/trayectos.js';
 
 export const porN = Object.fromEntries(MATERIAS.map((m) => [m.n, m]));
 export const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -335,6 +335,14 @@ export const esVerano = (id) => tipoCuatri(id) === 'VER';
 export const nombrePeriodo = (id) => esVerano(id) ? `Intensivo de febrero ${id.slice(0, 4)}` : `${tipoCuatri(id) === '1C' ? '1º' : '2º'} cuatrimestre ${id.slice(0, 4)}`;
 const ordenPeriodo = (id) => Number(id.slice(0, 4)) * 3 + ({ VER: 0, '1C': 1, '2C': 2 }[tipoCuatri(id)] ?? 0);
 const BASICAS_VERANO = [1, 2, 3, 9, 10];
+/**
+ * ¿El intensivo de febrero del período `id` (AAAA-VER) está sumado al plan?
+ * `opciones.veranos` = años activos ['2027', …]. Sin esa lista se respeta el
+ * interruptor viejo `incluirVerano` (todos los febreros), para datos y tests previos.
+ */
+export const veranoActivo = (opciones = {}, id = '') => Array.isArray(opciones?.veranos)
+  ? opciones.veranos.map(String).includes(String(id).slice(0, 4))
+  : !!opciones?.incluirVerano;
 /** Oferta posible, no confirmación de apertura. Las excepcionales se incluyen solo al declararlas. */
 export const ofertaVerano = (opciones = {}, id = '2027-VER') => {
   const anio = id.slice(0, 4);
@@ -357,7 +365,7 @@ const PERMITE = { A: ['1C'], '1C': ['1C'], '2C': ['2C'], '1C-2C': ['1C', '2C'], 
 const ofrecida = (n, id, opciones = {}) => {
   const m = itemDe(n);
   if (!m || (m.desde && Number(id.slice(0, 4)) < m.desde)) return false;
-  return esVerano(id) ? !!opciones.incluirVerano && ofertaVerano(opciones, id).includes(n) : !!PERMITE[m.modalidad]?.includes(tipoCuatri(id));
+  return esVerano(id) ? veranoActivo(opciones, id) && ofertaVerano(opciones, id).includes(n) : !!PERMITE[m.modalidad]?.includes(tipoCuatri(id));
 };
 // Las anuales de 1C terminan al finalizar 2C del mismo año. Un intensivo termina
 // en febrero: agregar VER al calendario no transforma una anual en tres períodos.
@@ -457,7 +465,7 @@ export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Se
   for (const n of ns) {
     const m = itemDe(n); if (!m) continue;
     if (esVerano(id)) {
-      if (!opciones.incluirVerano) out.push(`${nombreCorto(n)}: el período de verano es opcional; activalo para incluirlo en la proyección.`);
+      if (!veranoActivo(opciones, id)) out.push(`${nombreCorto(n)}: el intensivo de febrero ${id.slice(0, 4)} no está sumado al plan; sumalo para incluirlo en la proyección.`);
       if (!ofertaVerano(opciones, id).includes(n)) out.push(`${nombreCorto(n)}: no pertenece a la oferta de verano prevista; solo agregarla si su intensivo fue confirmado.`);
     } else if (sinCursar(estadoDe(est, n)) && m.modalidad && !PERMITE[m.modalidad]?.includes(tipoCuatri(id))) {
       out.push(`${nombreCorto(n)}: se dicta ${m.modalidad === 'A' ? 'como anual, arrancando en el 1º cuatrimestre' : `solo en el ${tipoCuatri(id) === '1C' ? '2º' : '1º'} cuatrimestre`}.`);
@@ -483,6 +491,36 @@ export function avisosCuatri(est, plan, ids, i, hsLimite = 30, recursar = new Se
   if (hs > hsLimite) out.push(`Te pasás por ${hs - hsLimite} hs del límite de ${hsLimite} hs semanales (límite provisorio).`);
   return out;
 }
+// Deuda = una correlativa que ya empezaste y todavía te falta cerrar. Lo que nunca cursaste
+// (pendiente) no es deuda: ese caso lo cubren los avisos de correlativas.
+const EMPEZADA_SIN_REGULARIZAR = new Set(['cursando', 'libre', 'abandono']);
+const EMPEZADA_SIN_FINAL = new Set(['regular', 'recursando', 'promocion', 'cursando', 'libre', 'abandono']);
+/**
+ * Correlativas de `n` que bloquean su cursado porque las DEBÉS. `real` = estado real de hoy;
+ * `proy` = estado proyectado al comenzar el período (estadoEnCuatri), así lo que el plan ya
+ * resuelve antes no se marca. -> { reg: [Nº que falta regularizar], aprob: [Nº con final adeudado] }
+ * Las asignaturas con correlativas sin confirmar (licenciaturas) no informan deudas.
+ */
+export function deudasDe(real, proy, n) {
+  const m = itemDe(n);
+  if (!m || m.correlativasConfirmadas === false) return { reg: [], aprob: [] };
+  return {
+    reg: (m.reg ?? []).filter((r) => !regOk(estadoDe(proy, r)) && EMPEZADA_SIN_REGULARIZAR.has(estadoDe(real, r))),
+    aprob: (m.aprob ?? []).filter((r) => !aprobada(proy, r) && EMPEZADA_SIN_FINAL.has(estadoDe(real, r))),
+  };
+}
+/**
+ * Proyección para marcar deudas al comenzar el período i: igual que estadoEnCuatri, pero sin
+ * suponer que lo que cursás HOY termina bien. Lo que te falta cerrar de la cursada actual
+ * sigue siendo deuda hasta que lo cargues como regular/aprobada o lo resuelva un período futuro del plan.
+ */
+export function proyeccionDeudas(est, plan, ids, i, opciones = {}) {
+  const cursando = Object.entries(est ?? {}).filter(([, d]) => d?.estado === 'cursando').map(([n]) => (esElectiva(n) ? n : Number(n)));
+  if (!cursando.length) return estadoEnCuatri(est, plan, ids, i, opciones);
+  const base = aplicar(est, Object.fromEntries(cursando.map((n) => [n, 'pendiente'])));
+  const planSinActual = { ...plan, [ids[0]]: (plan[ids[0]] ?? []).filter((n) => !cursando.includes(n)) };
+  return estadoEnCuatri(base, planSinActual, ids, i, opciones);
+}
 export const notasCuatri = (plan, ids, i) => (plan[ids[i]] ?? []).filter((n) => esContracuatri(n, ids[i])).map((n) => `${nombreCorto(n)}: contracuatrimestre · menos cátedras.`);
 /** Propuesta conservadora de cursado. Los pendientes bloqueados quedan explícitos en sinUbicar. */
 export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones } = {}) {
@@ -492,7 +530,7 @@ export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones }
   const puestas = new Set(plan[ids[0]]);
   const falta = () => MATERIAS_PLAN.filter((m) => sinCursar(estadoDe(est, m.n)) && !puestas.has(m.n));
   for (let i = 1; i < ids.length && falta().length; i++) {
-    if (esVerano(ids[i]) && !opciones.incluirVerano) continue;
+    if (esVerano(ids[i]) && !veranoActivo(opciones, ids[i])) continue;
     const proy = estadoEnCuatri(est, plan, ids, i, opciones);
     let libre = hsLimite - horasDe(continuan(est, plan, ids, i, opciones));
     const cand = falta().filter((m) => estaHabilitada(proy, m.n) && ofrecida(m.n, ids[i], opciones)
@@ -504,6 +542,47 @@ export function proponerPlan(est, ids, { hsLimite = 30, fijo = [], ...opciones }
     plan[ids[i]] = ordenarPlan(plan[ids[i]]);
   }
   return { plan, sinUbicar: falta().map((m) => m.n) };
+}
+
+// ---------- Planificador · mensaje para compartir ----------
+/** Año del plan a compartir: hasta octubre, el año en curso (todavía no te inscribiste); desde noviembre, el siguiente. */
+export const anioAMandar = (hoy = new Date()) => (hoy.getMonth() >= 10 ? hoy.getFullYear() + 1 : hoy.getFullYear());
+const listaY = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs.at(-1)}`);
+const nombreLicCorto = (id) => (LICENCIATURAS.find((l) => l.id === id)?.nombre ?? 'Licenciatura').replace(/^Licenciatura en /, 'Lic. ');
+function lineaWhatsApp(est, n, k, recursar) {
+  const m = itemDe(n);
+  let t = `${k + 1}. ${nombreCorto(n)}`;
+  if (esElectiva(n)) t += m.licenciatura ? ` — ${nombreLicCorto(m.licenciatura)} · ${m.creditos} créditos` : ` — electiva · ${m.creditos} créditos`;
+  const conds = [];
+  if (recursar.has(n)) conds.push('recursado, si me lo aprueban');
+  if (m.correlativasConfirmadas === false) conds.push('correlativas a confirmar');
+  else {
+    const f = faltan(est, m);
+    // «si regularizo A, B y C, y apruebo D y E»: un verbo por tipo, la coma antes de la «y» separa los grupos.
+    const reg = f.reg.length ? `regularizo ${listaY(f.reg.map(nombreCorto))}` : '';
+    const apr = f.aprob.length ? `apruebo ${listaY(f.aprob.map(nombreCorto))}` : '';
+    if (reg || apr) conds.push(`si ${reg && apr ? `${reg}${f.reg.length > 1 ? ',' : ''} y ${apr}` : reg || apr}`);
+  }
+  return conds.length ? `${t} _(${conds.join('; ')})_` : t;
+}
+/**
+ * Mensaje de WhatsApp con lo planificado para `anio`: intensivo de febrero, anuales y cada cuatrimestre.
+ * Las condiciones salen de las correlativas que HOY (estado real) no cumplís. '' si no hay nada planificado.
+ */
+export function textoPlanWhatsApp(est, plan, anio, opciones = {}, { nombre = '', recursar = [] } = {}) {
+  const rec = new Set(recursar);
+  const valida = (ns) => (ns ?? []).filter((n) => itemDe(n));
+  const verano = valida(plan[`${anio}-VER`]);
+  const primero = valida(plan[`${anio}-1C`]);
+  const anuales = primero.filter((n) => itemDe(n).modalidad === 'A');
+  const c1 = primero.filter((n) => !anuales.includes(n));
+  const c2 = valida(plan[`${anio}-2C`]).filter((n) => !primero.includes(n));
+  const secciones = [['☀️ *Intensivo de febrero*', verano], ['📅 *Anuales*', anuales], ['1️⃣ *1er cuatrimestre*', c1], ['2️⃣ *2do cuatrimestre*', c2]]
+    .filter(([, ns]) => ns.length)
+    .map(([titulo, ns]) => [titulo, ...ordenarPlan(ns).map((n, k) => lineaWhatsApp(est, n, k, rec))].join('\n'));
+  if (!secciones.length) return '';
+  const quien = String(nombre ?? '').trim();
+  return [`📚 *Plan ${anio}${quien ? ` · ${quien}` : ''}*`, ...secciones, '_Sujeto a correlativas, oferta e inscripción._'].join('\n\n');
 }
 
 /** Explica qué acción pide cada dependencia directa, sin prometer habilitación automática. */
@@ -518,9 +597,19 @@ export function razonEntrada(n) {
   if (relaciones.regular.length || relaciones.aprobada.length) partes.push('también deben cumplirse los demás requisitos de cada materia');
   const r = partes.join(' · '); return r[0].toUpperCase() + r.slice(1);
 }
-/** El Home conserva 1C/2C, incorporando febrero a la proyección solo si fue elegido. */
+/** Febreros activos (AAAA-VER) que caen dentro del rango de `ids`, sin importar si `ids` los trae. */
+const veranosEnRango = (ids, opciones) => {
+  if (!ids.length) return [];
+  const desde = ordenPeriodo(ids[0]); const hasta = ordenPeriodo(ids.at(-1)); const out = [];
+  for (let anio = Number(ids[0].slice(0, 4)); anio <= Number(ids.at(-1).slice(0, 4)); anio++) {
+    const id = `${anio}-VER`;
+    if (ordenPeriodo(id) >= desde && ordenPeriodo(id) <= hasta && veranoActivo(opciones, id)) out.push(id);
+  }
+  return out;
+};
+/** El Home conserva 1C/2C, incorporando a la proyección solo los febreros elegidos (por año). */
 export function planProximoAnio(est, ids = ['2026-2C', '2027-1C', '2027-2C'], opciones = {}) {
-  const timeline = opciones.incluirVerano ? [...new Set([...ids, `${ids.at(-1).slice(0, 4)}-VER`])].sort((a, b) => ordenPeriodo(a) - ordenPeriodo(b)) : ids;
+  const timeline = [...new Set([...ids.filter((id) => !esVerano(id) || veranoActivo(opciones, id)), ...veranosEnRango(ids, opciones)])].sort((a, b) => ordenPeriodo(a) - ordenPeriodo(b));
   const { plan } = proponerPlan(est, timeline, opciones);
   return ids.slice(1).map((id) => {
     const ns = plan[id] ?? [];
