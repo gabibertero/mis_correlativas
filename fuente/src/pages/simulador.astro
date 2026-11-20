@@ -92,6 +92,22 @@ const TILES = [['aprobadas', 'Aprobadas', 'de 36'], ['cursadas', 'Cursadas', 'in
           </div>
         ))}
       </dl>
+      <section class="progreso-sim" aria-labelledby="h-progreso-sim">
+        <header class="progreso-cab">
+          <h3 id="h-progreso-sim">Avance en el escenario</h3>
+          <p>Comparado con tus 36 materias obligatorias</p>
+        </header>
+        <div class="progreso-item" data-sim-avance="aprobadas" data-signo="0">
+          <p class="progreso-titulo"><strong>Aprobadas</strong><span class="num" data-sim-pct-proy="aprobadas">0%</span></p>
+          <progress max="100" value="0" data-sim-progress="aprobadas" aria-label="Porcentaje de materias aprobadas en el escenario">0%</progress>
+          <p class="progreso-detalle"><span>Hoy <b class="num" data-sim-pct-real="aprobadas">0%</b></span><span aria-hidden="true">→</span><span>Escenario <b class="num" data-sim-pct-lectura="aprobadas">0%</b></span><span class="progreso-delta num" data-sim-pct-delta="aprobadas">Igual</span></p>
+        </div>
+        <div class="progreso-item" data-sim-avance="cursadas" data-signo="0">
+          <p class="progreso-titulo"><strong>Regularizadas o aprobadas</strong><span class="num" data-sim-pct-proy="cursadas">0%</span></p>
+          <progress max="100" value="0" data-sim-progress="cursadas" aria-label="Porcentaje de materias regularizadas o aprobadas en el escenario">0%</progress>
+          <p class="progreso-detalle"><span>Hoy <b class="num" data-sim-pct-real="cursadas">0%</b></span><span aria-hidden="true">→</span><span>Escenario <b class="num" data-sim-pct-lectura="cursadas">0%</b></span><span class="progreso-delta num" data-sim-pct-delta="cursadas">Igual</span></p>
+        </div>
+      </section>
       <div class="res-listas" hidden>
         <section><h3>Nuevas para cursar <span class="cuenta num" data-sim-n="cursar"></span></h3><ul data-sim-lista="cursar"></ul></section>
         <section><h3>Nuevos finales <span class="cuenta num" data-sim-n="finales"></span></h3><ul data-sim-lista="finales"></ul></section>
@@ -196,16 +212,34 @@ const TILES = [['aprobadas', 'Aprobadas', 'de 36'], ['cursadas', 'Cursadas', 'in
   .tile[data-signo='-1'] .delta { background: var(--e-libre-bg); color: var(--e-libre); }
   .tile[data-signo='0'] .delta { color: var(--suave); padding-inline: 0; font-weight: 600; }
   .resultado[data-cambios='no'] .tile-antes, .resultado[data-cambios='no'] .delta { display: none; }
+  .progreso-sim { display: grid; gap: var(--s-3); margin-top: var(--s-4); }
+  .progreso-cab h3 { font-size: var(--t-m); }
+  .progreso-cab p { margin-top: 2px; font-size: var(--t-xs); color: var(--suave); }
+  .progreso-item { display: grid; gap: var(--s-1); padding: var(--s-3); border: 1px solid var(--borde); border-radius: var(--r-s); background: var(--sup); transition: border-color .3s var(--suave-ease), background .3s var(--suave-ease), transform .3s var(--suave-ease); }
+  .progreso-item[data-signo='1'] { border-color: color-mix(in srgb, var(--acento) 48%, var(--borde)); background: color-mix(in srgb, var(--acento-suave) 38%, var(--sup)); }
+  .progreso-item[data-signo='-1'] { border-color: color-mix(in srgb, var(--e-libre) 48%, var(--borde)); background: color-mix(in srgb, var(--e-libre-bg) 42%, var(--sup)); }
+  .progreso-titulo, .progreso-detalle { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); margin: 0; }
+  .progreso-titulo { font-size: var(--t-xs); }
+  .progreso-titulo > span { font-family: var(--f-disp); font-size: var(--t-m); font-variant-numeric: tabular-nums; }
+  .progreso-item progress { height: 10px; margin: 2px 0; --relleno: var(--acento2); --marca: var(--acento); }
+  .progreso-detalle { flex-wrap: wrap; justify-content: flex-start; color: var(--suave); font-size: var(--t-xs); font-variant-numeric: tabular-nums; }
+  .progreso-detalle b { color: var(--texto); }
+  .progreso-delta { margin-left: auto; color: var(--acento); font-weight: 800; }
+  [data-signo='-1'] .progreso-delta { color: var(--e-libre); }
+  .progreso-item[data-signo='0'] .progreso-delta { color: var(--suave); }
   .res-listas { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
   .res-listas h3 { display: flex; align-items: center; gap: var(--s-2); font-size: var(--t-m); margin-bottom: var(--s-2); }
   .res-listas h3 .cuenta { font-size: var(--t-xs); padding: 0 7px; border-radius: 999px; background: var(--acento-suave); color: var(--acento); }
   .res-listas .perdidas h3 .cuenta { background: var(--e-libre-bg); color: var(--e-libre); }
   .res-listas ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); font-size: var(--t-s); }
-  .res-listas li:not(.vacio) { display: flex; align-items: start; gap: var(--s-3); line-height: 1.3; font-weight: 600; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); }
+  .res-listas li:not(.vacio) { display: flex; align-items: start; gap: var(--s-3); line-height: 1.3; font-weight: 600; padding: var(--s-2) var(--s-3); border-radius: var(--r-s); background: var(--sup); border: 1px solid var(--borde); animation: sim-entra .32s var(--suave-ease) both; }
   .res-listas .perdidas li:not(.vacio) { border-left: 4px solid var(--e-libre); }
   .res-listas li .n { width: 28px; height: 28px; border-radius: 8px; font-size: var(--t-xs); }
   .res-listas small { display: block; margin-top: 2px; color: var(--suave); font-weight: 400; font-size: var(--t-xs); }
   .res-listas .vacio { text-align: left; padding: var(--s-2) var(--s-3); }
+  @keyframes sim-entra { from { opacity: 0; transform: translateY(7px); } }
+  .sim button { transition: transform .18s var(--suave-ease), background .2s, border-color .2s, color .2s; }
+  .sim button:active { transform: scale(.98); }
 
   /* Barra fija del celular: resumen + atajo al resultado (encima de la nav inferior) */
   .barra-sim { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom); z-index: 25; display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); background: color-mix(in srgb, var(--sup) 96%, transparent); backdrop-filter: blur(10px); border-top: 2px solid var(--acento2); box-shadow: 0 -6px 18px rgb(0 0 0 / .12); }

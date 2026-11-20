@@ -19,6 +19,8 @@ const listas = $('.res-listas');
 const buscar = $('[data-sim-buscar]');
 const filtros = $$('[data-sim-filtro]');
 const barra = $('[data-sim-barra]');
+const movimientoReducido = matchMedia('(prefers-reduced-motion: reduce)');
+const TOTAL_MATERIAS = MATERIAS_PLAN.length;
 const clave = (v) => /^\d+$/.test(v) ? Number(v) : v;
 const itemDe = (n) => M.esElectiva(n) ? M.electivaPorId[n] : M.porN[n];
 const activa = (f) => !f.dataset.simLicenciaturaId || f.dataset.simLicenciaturaId === licenciatura;
@@ -28,6 +30,30 @@ const radio = (f, v) => $(`input[value="${v}"]`, f);
 const accionDe = (f) => $('[data-sim-opciones] input:checked', f)?.value ?? 'real';
 const filtroActual = () => filtros.find((r) => r.checked)?.value ?? 'todas';
 const habilitadaHoy = (f) => M.estaHabilitada(real, clave(f.dataset.simMateria));
+const porcentaje = (n) => Math.round((n / TOTAL_MATERIAS) * 100);
+const textoPorcentaje = (n) => `${n}%`;
+const textoPuntos = (n) => n > 0 ? `+${n} p.p.` : n < 0 ? `−${-n} p.p.` : 'Igual';
+
+function contarPorcentaje(nodo, valor) {
+  if (nodo._objetivo === valor) return;
+  const desde = (nodo._valor ?? Number.parseInt(nodo.textContent, 10)) || 0;
+  nodo._objetivo = valor;
+  if (movimientoReducido.matches || desde === valor) {
+    nodo.textContent = textoPorcentaje(valor);
+    nodo._valor = valor;
+    return;
+  }
+  cancelAnimationFrame(nodo._raf);
+  const inicio = performance.now();
+  const avanzar = (ahora) => {
+    const t = Math.min(1, (ahora - inicio) / 420);
+    const suave = 1 - (1 - t) ** 3;
+    nodo._valor = Math.round(desde + (valor - desde) * suave);
+    nodo.textContent = textoPorcentaje(nodo._valor);
+    if (t < 1) nodo._raf = requestAnimationFrame(avanzar);
+  };
+  nodo._raf = requestAnimationFrame(avanzar);
+}
 
 function actualizarReal() {
   licenciatura = cargarLicenciatura();
@@ -132,6 +158,19 @@ function pintar() {
     $(`[data-sim-proy="${id}"]`).textContent = despues[id];
     $(`[data-sim-delta="${id}"]`).textContent = k ? S.textoDelta(d) : '';
     $(`[data-sim-tile="${id}"]`).dataset.signo = String(Math.sign(d));
+  }
+  for (const id of ['aprobadas', 'cursadas']) {
+    const hoy = porcentaje(antes[id]);
+    const escenario = porcentaje(despues[id]);
+    const diferencia = escenario - hoy;
+    const barraProgreso = $(`[data-sim-progress="${id}"]`);
+    barraProgreso.value = escenario;
+    barraProgreso.textContent = textoPorcentaje(escenario);
+    $(`[data-sim-avance="${id}"]`).dataset.signo = String(Math.sign(diferencia));
+    $(`[data-sim-pct-real="${id}"]`).textContent = textoPorcentaje(hoy);
+    $(`[data-sim-pct-lectura="${id}"]`).textContent = textoPorcentaje(escenario);
+    contarPorcentaje($(`[data-sim-pct-proy="${id}"]`), escenario);
+    $(`[data-sim-pct-delta="${id}"]`).textContent = textoPuntos(diferencia);
   }
   const { cursar, finales, perdidas } = S.diferencias(real, sim, candidatas);
   const mostrar = (tipo, ns, final, texto) => $(`[data-sim-lista="${tipo}"]`).replaceChildren(...(ns.length ? ns.map((n) => filaMateria(n, requisitos(n, final))) : [vacio(texto)]));

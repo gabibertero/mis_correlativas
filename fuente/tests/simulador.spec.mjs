@@ -64,6 +64,27 @@ test('regularizar AM II habilita Análisis Numérico y su final; volver a mi est
   await sinDesborde(page);
 });
 
+test('el avance distingue aprobadas del total regularizado en cada escenario', async ({ page }) => {
+  await preparar(page, { estado: DEBE });
+  await page.goto('simulador/');
+  await expect(page.locator('[data-sim-pct-real="aprobadas"]')).toHaveText('6%');
+  await expect(page.locator('[data-sim-pct-proy="aprobadas"]')).toHaveText('6%');
+  await expect(page.locator('[data-sim-pct-real="cursadas"]')).toHaveText('8%');
+
+  await fila(page, 9).locator('[data-sim-op="regular"]').click();
+  await expect(page.locator('[data-sim-pct-proy="aprobadas"]')).toHaveText('6%');
+  await expect(page.locator('[data-sim-pct-delta="aprobadas"]')).toHaveText('Igual');
+  await expect(page.locator('[data-sim-pct-proy="cursadas"]')).toHaveText('11%');
+  await expect(page.locator('[data-sim-pct-delta="cursadas"]')).toHaveText('+3 p.p.');
+  await expect(page.locator('[data-sim-progress="cursadas"]')).toHaveJSProperty('value', 11);
+
+  await fila(page, 9).locator('[data-sim-op="aprobada"]').click();
+  await expect(page.locator('[data-sim-pct-proy="aprobadas"]')).toHaveText('8%');
+  await expect(page.locator('[data-sim-pct-delta="aprobadas"]')).toHaveText('+2 p.p.');
+  await expect(page.locator('[data-sim-progress="aprobadas"]')).toHaveJSProperty('value', 8);
+  await expect(page.locator('[data-sim-pct-proy="cursadas"]')).toHaveText('11%');
+});
+
 test('cada fila ofrece solo las acciones que cambian algo y se maneja con teclado', async ({ page }) => {
   await preparar(page, { estado: DEBE });
   await page.goto('simulador/');
